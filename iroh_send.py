@@ -193,6 +193,16 @@ def receiver_mode(token: str, verbose: bool = False):
 
     metadata_wrapper = json.loads(metadata_bytes.decode("utf-8"))
     logger.debug(f"Parsed metadata wrapper: {metadata_wrapper}")
+    logger.debug(f"Metadata wrapper type: {type(metadata_wrapper)}")
+
+    # Type checking to ensure metadata_wrapper is a dict - this validates JSON structure
+    if not isinstance(metadata_wrapper, dict):
+        print(
+            f"ERROR: Expected metadata_wrapper to be dict, got {type(metadata_wrapper)}"
+        )
+        print(f"Metadata wrapper content: {metadata_wrapper}")
+        node.close()
+        sys.exit(1)
 
     # Check version compatibility - version mismatch causes immediate crash to prevent protocol errors
     received_version = metadata_wrapper.get("version")
@@ -204,7 +214,24 @@ def receiver_mode(token: str, verbose: bool = False):
         sys.exit(1)
 
     metadata = metadata_wrapper["items"]
+    logger.debug(f"Metadata items type: {type(metadata)}")
+
+    # Type checking to ensure items is a list - this validates JSON structure
+    if not isinstance(metadata, list):
+        print(f"ERROR: Expected metadata['items'] to be list, got {type(metadata)}")
+        print(f"Metadata content: {metadata}")
+        node.close()
+        sys.exit(1)
+
     print(f"Received metadata for {len(metadata)} items")
+
+    # Type checking to ensure each item is a dict - this validates JSON structure
+    for i, item in enumerate(metadata):
+        if not isinstance(item, dict):
+            print(f"ERROR: Expected metadata item {i} to be dict, got {type(item)}")
+            print(f"Item content: {item}")
+            node.close()
+            sys.exit(1)
 
     # Check if any files already exist
     logger.debug("Checking if any destination paths already exist...")
