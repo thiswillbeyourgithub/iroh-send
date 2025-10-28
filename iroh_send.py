@@ -36,6 +36,9 @@ import fire
 from tqdm import tqdm
 from prime_iroh import Node
 
+# Version of the protocol - sender and receiver must match
+VERSION = "1.0.0"
+
 
 def derive_seeds(token: str) -> Tuple[int, int]:
     """Derive sender and receiver seeds from token using SHA256."""
@@ -188,9 +191,19 @@ def receiver_mode(token: str, verbose: bool = False):
         sys.exit(1)
     logger.debug(f"Received {len(metadata_bytes)} bytes of metadata")
 
-    metadata = json.loads(metadata_bytes.decode("utf-8"))
-    logger.debug(f"Parsed metadata: {metadata}")
+    metadata_wrapper = json.loads(metadata_bytes.decode("utf-8"))
+    logger.debug(f"Parsed metadata wrapper: {metadata_wrapper}")
 
+    # Check version compatibility - version mismatch causes immediate crash to prevent protocol errors
+    received_version = metadata_wrapper.get("version")
+    if received_version != VERSION:
+        print(
+            f"ERROR: Version mismatch! Receiver version: {VERSION}, Sender version: {received_version}"
+        )
+        node.close()
+        sys.exit(1)
+
+    metadata = metadata_wrapper["items"]
     print(f"Received metadata for {len(metadata)} items")
 
     # Check if any files already exist
@@ -358,11 +371,12 @@ def sender_mode(token: str, files: List[str], verbose: bool = False):
             )
             total_size += file_size
 
-    # Send metadata
+    # Send metadata with version - version is included to ensure protocol compatibility
     logger.debug(
         f"Total size to send: {total_size} bytes ({total_size / 1024 / 1024:.2f} MB)"
     )
-    metadata_json = json.dumps(metadata)
+    metadata_wrapper = {"version": VERSION, "items": metadata}
+    metadata_json = json.dumps(metadata_wrapper)
     metadata_bytes = metadata_json.encode("utf-8")
     print(f"Metadata JSON ({len(metadata_bytes)} bytes): {metadata_json}")
 
