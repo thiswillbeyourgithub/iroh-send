@@ -51,6 +51,30 @@ def derive_seeds(token: str) -> Tuple[int, int]:
     return sender_seed, receiver_seed
 
 
+def get_peer_id_from_seed(seed: int) -> str:
+    """Get the peer ID that would be generated from a given seed."""
+    # Create temporary node to get its peer ID
+    temp_node = Node.with_seed(1, seed=seed)
+    peer_id = temp_node.peer_id()
+    temp_node.close()
+    return peer_id
+
+
+def establish_connection(node: Node, peer_id: str, timeout: int = 30) -> bool:
+    """Establish connection to peer and wait until ready."""
+    print(f"Connecting to peer {peer_id[:16]}...")
+    node.connect(peer_id, timeout)
+    
+    start_time = time.time()
+    while not node.is_ready():
+        if time.time() - start_time > timeout:
+            return False
+        time.sleep(0.1)
+    
+    print("Connected to peer!")
+    return True
+
+
 def main(*files):
     """Main entry point for iroh_send script."""
     # Initialize logging
@@ -73,14 +97,44 @@ def main(*files):
 
 def receiver_mode(token: str):
     """Run in receiver mode - wait for files."""
-    print("Receiver mode not yet implemented")
-    pass
+    sender_seed, receiver_seed = derive_seeds(token)
+    sender_peer_id = get_peer_id_from_seed(sender_seed)
+    
+    # Initialize receiver node
+    node = Node.with_seed(1, seed=receiver_seed)
+    print(f"Receiver node ID: {node.peer_id()}")
+    
+    # Connect to sender
+    if not establish_connection(node, sender_peer_id):
+        print("ERROR: Failed to connect to sender")
+        node.close()
+        sys.exit(1)
+    
+    print("Receiver ready - waiting for files...")
+    # TODO: Implement file receiving logic
+    
+    node.close()
 
 
 def sender_mode(token: str, files: List[str]):
     """Run in sender mode - send files."""
-    print("Sender mode not yet implemented")
-    pass
+    sender_seed, receiver_seed = derive_seeds(token)
+    receiver_peer_id = get_peer_id_from_seed(receiver_seed)
+    
+    # Initialize sender node
+    node = Node.with_seed(1, seed=sender_seed)
+    print(f"Sender node ID: {node.peer_id()}")
+    
+    # Connect to receiver
+    if not establish_connection(node, receiver_peer_id):
+        print("ERROR: Failed to connect to receiver")
+        node.close()
+        sys.exit(1)
+    
+    print(f"Sender ready - preparing to send {len(files)} items...")
+    # TODO: Implement file sending logic
+    
+    node.close()
 
 
 if __name__ == "__main__":
