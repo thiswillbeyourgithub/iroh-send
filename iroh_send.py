@@ -110,8 +110,25 @@ def receiver_mode(token: str):
         node.close()
         sys.exit(1)
     
-    print("Receiver ready - waiting for files...")
-    # TODO: Implement file receiving logic
+    print("Receiver ready - waiting for metadata...")
+    
+    # Receive metadata
+    recv_work = node.irecv(0)
+    metadata_bytes = recv_work.wait()
+    metadata = json.loads(metadata_bytes.decode('utf-8'))
+    
+    print(f"Received metadata for {len(metadata)} items")
+    
+    # Check if any files already exist
+    for item in metadata:
+        path = Path(item['path'])
+        if path.exists():
+            print(f"ERROR: File/directory already exists: {path}")
+            node.close()
+            sys.exit(1)
+    
+    print("All paths clear - ready to receive files")
+    # TODO: Implement actual file receiving
     
     node.close()
 
@@ -131,8 +148,40 @@ def sender_mode(token: str, files: List[str]):
         node.close()
         sys.exit(1)
     
-    print(f"Sender ready - preparing to send {len(files)} items...")
-    # TODO: Implement file sending logic
+    print(f"Sender ready - preparing metadata for {len(files)} items...")
+    
+    # Prepare metadata
+    metadata = []
+    for file_path in files:
+        path = Path(file_path)
+        if not path.exists():
+            print(f"ERROR: File/directory does not exist: {path}")
+            node.close()
+            sys.exit(1)
+        
+        if path.is_dir():
+            # For directories, we'll send as compressed tar
+            metadata.append({
+                'path': str(path),
+                'is_directory': True,
+                'size': 0  # Will be calculated during compression
+            })
+        else:
+            # For files, get actual size
+            metadata.append({
+                'path': str(path),
+                'is_directory': False,
+                'size': path.stat().st_size
+            })
+    
+    # Send metadata
+    metadata_json = json.dumps(metadata)
+    metadata_bytes = metadata_json.encode('utf-8')
+    send_work = node.isend(metadata_bytes, 0, 1000)
+    send_work.wait()
+    
+    print(f"Metadata sent - ready to send files")
+    # TODO: Implement actual file sending
     
     node.close()
 
