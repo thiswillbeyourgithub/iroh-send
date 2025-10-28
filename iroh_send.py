@@ -129,38 +129,42 @@ def receiver_mode(token: str):
     
     print("All paths clear - ready to receive files")
     
-    # Receive files
-    for i, item in enumerate(metadata):
-        path = Path(item['path'])
-        is_directory = item['is_directory']
-        
-        print(f"Receiving {path} ({'directory' if is_directory else 'file'})...")
-        
-        # Check again that path doesn't exist (safety check)
-        if path.exists():
-            print(f"ERROR: File/directory created during transfer: {path}")
-            node.close()
-            sys.exit(1)
-        
-        # Receive file data
-        recv_work = node.irecv(i + 1)  # Stream 0 was metadata, files start at 1
-        file_data = recv_work.wait()
-        
-        if is_directory:
-            # Extract tar archive
-            with tempfile.NamedTemporaryFile() as temp_file:
-                temp_file.write(file_data)
-                temp_file.flush()
-                
-                with tarfile.open(temp_file.name, 'r:gz') as tar:
-                    tar.extractall(path=path.parent)
-        else:
-            # Write regular file
-            path.parent.mkdir(parents=True, exist_ok=True)
-            with open(path, 'wb') as f:
-                f.write(file_data)
-        
-        print(f"Received: {path}")
+    # Calculate total size for progress bar
+    total_size = sum(item['size'] for item in metadata)
+    
+    # Receive files with progress bar
+    with tqdm(total=total_size, unit='B', unit_scale=True, desc="Receiving") as pbar:
+        for i, item in enumerate(metadata):
+            path = Path(item['path'])
+            is_directory = item['is_directory']
+            
+            # Check again that path doesn't exist (safety check)
+            if path.exists():
+                print(f"ERROR: File/directory created during transfer: {path}")
+                node.close()
+                sys.exit(1)
+            
+            # Receive file data
+            recv_work = node.irecv(i + 1)  # Stream 0 was metadata, files start at 1
+            file_data = recv_work.wait()
+            
+            if is_directory:
+                # Extract tar archive
+                with tempfile.NamedTemporaryFile() as temp_file:
+                    temp_file.write(file_data)
+                    temp_file.flush()
+                    
+                    with tarfile.open(temp_file.name, 'r:gz') as tar:
+                        tar.extractall(path=path.parent)
+            else:
+                # Write regular file
+                path.parent.mkdir(parents=True, exist_ok=True)
+                with open(path, 'wb') as f:
+                    f.write(file_data)
+            
+            # Update progress bar
+            pbar.update(len(file_data))
+            pbar.set_postfix(file=str(path))
     
     print("All files received successfully!")
     node.close()
@@ -183,8 +187,10 @@ def sender_mode(token: str, files: List[str]):
     
     print(f"Sender ready - preparing metadata for {len(files)} items...")
     
-    # Prepare metadata
+    # Prepare metadata and calculate sizes
     metadata = []
+    total_size = 0
+    
     for file_path in files:
         path = Path(file_path)
         if not path.exists():
@@ -193,19 +199,29 @@ def sender_mode(token: str, files: List[str]):
             sys.exit(1)
         
         if path.is_dir():
-            # For directories, we'll send as compressed tar
+            # For directories, calculate compressed size
+            with tempfile.NamedTemporaryFile() as temp_file:
+                with tarfile.open(temp_file.name, 'w:gz') as tar:
+                    tar.add(path, arcname=path.name)
+                
+                temp_file.seek(0, 2)  # Seek to end
+                compressed_size = temp_file.tell()
+                
             metadata.append({
                 'path': str(path),
                 'is_directory': True,
-                'size': 0  # Will be calculated during compression
+                'size': compressed_size
             })
+            total_size += compressed_size
         else:
             # For files, get actual size
+            file_size = path.stat().st_size
             metadata.append({
                 'path': str(path),
                 'is_directory': False,
-                'size': path.stat().st_size
+                'size': file_size
             })
+            total_size += file_size
     
     # Send metadata
     metadata_json = json.dumps(metadata)
@@ -215,31 +231,32 @@ def sender_mode(token: str, files: List[str]):
     
     print(f"Metadata sent - ready to send files")
     
-    # Send files
-    for i, (file_path, meta) in enumerate(zip(files, metadata)):
-        path = Path(file_path)
-        is_directory = meta['is_directory']
-        
-        print(f"Sending {path} ({'directory' if is_directory else 'file'})...")
-        
-        if is_directory:
-            # Create tar archive in memory
-            with tempfile.NamedTemporaryFile() as temp_file:
-                with tarfile.open(temp_file.name, 'w:gz') as tar:
-                    tar.add(path, arcname=path.name)
-                
-                temp_file.seek(0)
-                file_data = temp_file.read()
-        else:
-            # Read regular file
-            with open(path, 'rb') as f:
-                file_data = f.read()
-        
-        # Send file data
-        send_work = node.isend(file_data, i + 1, 1000)  # Stream 0 was metadata
-        send_work.wait()
-        
-        print(f"Sent: {path}")
+    # Send files with progress bar
+    with tqdm(total=total_size, unit='B', unit_scale=True, desc="Sending") as pbar:
+        for i, (file_path, meta) in enumerate(zip(files, metadata)):
+            path = Path(file_path)
+            is_directory = meta['is_directory']
+            
+            if is_directory:
+                # Create tar archive in memory
+                with tempfile.NamedTemporaryFile() as temp_file:
+                    with tarfile.open(temp_file.name, 'w:gz') as tar:
+                        tar.add(path, arcname=path.name)
+                    
+                    temp_file.seek(0)
+                    file_data = temp_file.read()
+            else:
+                # Read regular file
+                with open(path, 'rb') as f:
+                    file_data = f.read()
+            
+            # Send file data
+            send_work = node.isend(file_data, i + 1, 1000)  # Stream 0 was metadata
+            send_work.wait()
+            
+            # Update progress bar
+            pbar.update(len(file_data))
+            pbar.set_postfix(file=str(path))
     
     print("All files sent successfully!")
     node.close()
