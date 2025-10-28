@@ -281,7 +281,12 @@ def sender_mode(token: str, files: List[str], verbose: bool = False):
 
         if path.is_dir():
             # Resolve "." and ".." to actual directory name to avoid conflicts on receiver
-            actual_name = path.resolve().name if path.name in (".", "..") else path.name
+            if path.name in (".", ".."):
+                resolved_name = path.resolve().name
+                # Handle edge case of root directory where .name is empty
+                actual_name = resolved_name if resolved_name else "root"
+            else:
+                actual_name = path.name
 
             # For directories, calculate compressed size
             logger.debug(f"Creating tar archive for directory: {path}")
@@ -299,7 +304,12 @@ def sender_mode(token: str, files: List[str], verbose: bool = False):
             total_size += compressed_size
         else:
             # Resolve "." and ".." to actual name (though unlikely for files)
-            actual_name = path.resolve().name if path.name in (".", "..") else path.name
+            if path.name in (".", ".."):
+                resolved_name = path.resolve().name
+                # Handle edge case of root directory where .name is empty
+                actual_name = resolved_name if resolved_name else "root"
+            else:
+                actual_name = path.name
 
             # For files, get actual size
             file_size = path.stat().st_size
@@ -338,7 +348,8 @@ def sender_mode(token: str, files: List[str], verbose: bool = False):
                 logger.debug(f"Creating tar archive for: {path}")
                 with tempfile.NamedTemporaryFile() as temp_file:
                     with tarfile.open(temp_file.name, "w:gz") as tar:
-                        tar.add(path, arcname=path.name)
+                        # Use the path from metadata to ensure consistency with what receiver expects
+                        tar.add(path, arcname=meta["path"])
 
                     temp_file.seek(0)
                     file_data = temp_file.read()
