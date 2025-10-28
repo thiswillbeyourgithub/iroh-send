@@ -77,7 +77,7 @@ def establish_connection(node: Node, node_id: str, timeout: int = 30) -> bool:
 
 def main(*files, verbose: bool = False):
     """Main entry point for iroh_send script.
-    
+
     Parameters
     ----------
     *files : str
@@ -88,11 +88,10 @@ def main(*files, verbose: bool = False):
     # Initialize logging with appropriate level based on verbose flag
     log_level = logging.DEBUG if verbose else logging.INFO
     logging.basicConfig(
-        level=log_level,
-        format='%(asctime)s - %(levelname)s - %(message)s'
+        level=log_level, format="%(asctime)s - %(levelname)s - %(message)s"
     )
     logger = logging.getLogger(__name__)
-    
+
     if verbose:
         logger.debug("Verbose mode enabled")
         logger.debug(f"Python version: {sys.version}")
@@ -115,7 +114,7 @@ def main(*files, verbose: bool = False):
 
 def receiver_mode(token: str, verbose: bool = False):
     """Run in receiver mode - wait for files.
-    
+
     Parameters
     ----------
     token : str
@@ -124,12 +123,12 @@ def receiver_mode(token: str, verbose: bool = False):
         Enable verbose debug logging, by default False
     """
     logger = logging.getLogger(__name__)
-    
+
     logger.debug(f"Token: {token[:8]}...{token[-8:]}")
     sender_seed, receiver_seed = derive_seeds(token)
     logger.debug(f"Sender seed: {sender_seed}")
     logger.debug(f"Receiver seed: {receiver_seed}")
-    
+
     sender_node_id = get_node_id_from_seed(sender_seed)
     logger.debug(f"Sender node ID: {sender_node_id}")
 
@@ -154,7 +153,7 @@ def receiver_mode(token: str, verbose: bool = False):
     recv_work = node.irecv(0)
     metadata_bytes = recv_work.wait()
     logger.debug(f"Received {len(metadata_bytes)} bytes of metadata")
-    
+
     metadata = json.loads(metadata_bytes.decode("utf-8"))
     logger.debug(f"Parsed metadata: {metadata}")
 
@@ -174,14 +173,18 @@ def receiver_mode(token: str, verbose: bool = False):
 
     # Calculate total size for progress bar
     total_size = sum(item["size"] for item in metadata)
-    logger.debug(f"Total size to receive: {total_size} bytes ({total_size / 1024 / 1024:.2f} MB)")
+    logger.debug(
+        f"Total size to receive: {total_size} bytes ({total_size / 1024 / 1024:.2f} MB)"
+    )
 
     # Receive files with progress bar
     with tqdm(total=total_size, unit="B", unit_scale=True, desc="Receiving") as pbar:
         for i, item in enumerate(metadata):
             path = Path(item["path"])
             is_directory = item["is_directory"]
-            logger.debug(f"Receiving item {i+1}/{len(metadata)}: {path} (directory={is_directory})")
+            logger.debug(
+                f"Receiving item {i + 1}/{len(metadata)}: {path} (directory={is_directory})"
+            )
 
             # Check again that path doesn't exist (safety check)
             if path.exists():
@@ -225,7 +228,7 @@ def receiver_mode(token: str, verbose: bool = False):
 
 def sender_mode(token: str, files: List[str], verbose: bool = False):
     """Run in sender mode - send files.
-    
+
     Parameters
     ----------
     token : str
@@ -236,12 +239,12 @@ def sender_mode(token: str, files: List[str], verbose: bool = False):
         Enable verbose debug logging, by default False
     """
     logger = logging.getLogger(__name__)
-    
+
     logger.debug(f"Token: {token[:8]}...{token[-8:]}")
     sender_seed, receiver_seed = derive_seeds(token)
     logger.debug(f"Sender seed: {sender_seed}")
     logger.debug(f"Receiver seed: {receiver_seed}")
-    
+
     receiver_node_id = get_node_id_from_seed(receiver_seed)
     logger.debug(f"Receiver node ID: {receiver_node_id}")
 
@@ -268,7 +271,7 @@ def sender_mode(token: str, files: List[str], verbose: bool = False):
     for file_path in files:
         path = Path(file_path)
         logger.debug(f"Processing: {path}")
-        
+
         if not path.exists():
             print(f"ERROR: File/directory does not exist: {path}")
             node.close()
@@ -283,7 +286,7 @@ def sender_mode(token: str, files: List[str], verbose: bool = False):
 
                 temp_file.seek(0, 2)  # Seek to end
                 compressed_size = temp_file.tell()
-            
+
             logger.debug(f"Compressed size for {path}: {compressed_size} bytes")
             metadata.append(
                 {"path": str(path), "is_directory": True, "size": compressed_size}
@@ -299,11 +302,13 @@ def sender_mode(token: str, files: List[str], verbose: bool = False):
             total_size += file_size
 
     # Send metadata
-    logger.debug(f"Total size to send: {total_size} bytes ({total_size / 1024 / 1024:.2f} MB)")
+    logger.debug(
+        f"Total size to send: {total_size} bytes ({total_size / 1024 / 1024:.2f} MB)"
+    )
     metadata_json = json.dumps(metadata)
     metadata_bytes = metadata_json.encode("utf-8")
     logger.debug(f"Metadata JSON ({len(metadata_bytes)} bytes): {metadata_json}")
-    
+
     logger.debug("Sending metadata...")
     send_work = node.isend(metadata_bytes, 0, 1000)
     send_work.wait()
@@ -316,7 +321,9 @@ def sender_mode(token: str, files: List[str], verbose: bool = False):
         for i, (file_path, meta) in enumerate(zip(files, metadata)):
             path = Path(file_path)
             is_directory = meta["is_directory"]
-            logger.debug(f"Sending item {i+1}/{len(metadata)}: {path} (directory={is_directory})")
+            logger.debug(
+                f"Sending item {i + 1}/{len(metadata)}: {path} (directory={is_directory})"
+            )
 
             if is_directory:
                 # Create tar archive in memory
