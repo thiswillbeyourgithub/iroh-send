@@ -2,7 +2,7 @@
 """
 Self-contained file transfer script using prime-iroh.
 
-Requirements for uvx:
+Requirements for uv run:
 # /// script
 # requires-python = ">=3.8"
 # dependencies = [
@@ -14,10 +14,10 @@ Requirements for uvx:
 
 Usage:
     # Receiver mode (no files specified)
-    uvx iroh_send.py
+    uv run iroh_send.py
 
     # Sender mode (files/directories specified)
-    uvx iroh_send.py file1.txt dir1/ file2.py
+    uv run iroh_send.py file1.txt dir1/ file2.py
 """
 
 import os

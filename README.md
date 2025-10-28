@@ -10,17 +10,17 @@ This script was developed with assistance from [aider.chat](https://github.com/A
 - **Directory support**: Automatically compresses and transfers entire directories
 - **Progress tracking**: Real-time progress bars showing transfer status
 - **Deterministic connections**: Uses shared token to derive connection parameters
-- **Zero configuration**: Self-contained script runs via `uvx` with automatic dependency management
+- **Zero configuration**: Self-contained script runs via `uv run` with automatic dependency management
 - **Verbose logging**: Optional debug mode for troubleshooting
 
 ## Requirements
 
 - Python 3.8 or higher
-- `uvx` (part of the `uv` package manager)
+- `uv run` (part of the `uv` package manager)
 
 ## Installation
 
-No installation needed! The script uses `uvx` to automatically fetch dependencies when run.
+No installation needed! The script uses `uv run` to automatically fetch dependencies when run.
 
 If you don't have `uv` installed:
 
@@ -44,7 +44,7 @@ On the receiving machine:
 
 ```bash
 export IROH_SEND_TOKEN="your-secret-token-here"
-uvx iroh_send.py
+uv run iroh_send.py
 ```
 
 The receiver will:
@@ -60,7 +60,7 @@ On the sending machine:
 
 ```bash
 export IROH_SEND_TOKEN="your-secret-token-here"
-uvx iroh_send.py file1.txt directory/ file2.py
+uv run iroh_send.py file1.txt directory/ file2.py
 ```
 
 The sender will:
@@ -75,7 +75,7 @@ The sender will:
 Enable detailed logging for troubleshooting:
 
 ```bash
-uvx iroh_send.py --verbose file1.txt
+uv run iroh_send.py --verbose file1.txt
 ```
 
 ## Examples
@@ -85,13 +85,13 @@ uvx iroh_send.py --verbose file1.txt
 Receiver:
 ```bash
 export IROH_SEND_TOKEN="my-unique-token-12345"
-uvx iroh_send.py
+uv run iroh_send.py
 ```
 
 Sender:
 ```bash
 export IROH_SEND_TOKEN="my-unique-token-12345"
-uvx iroh_send.py report.pdf
+uv run iroh_send.py report.pdf
 ```
 
 ### Transfer multiple files and directories
@@ -99,7 +99,7 @@ uvx iroh_send.py report.pdf
 Sender:
 ```bash
 export IROH_SEND_TOKEN="my-unique-token-12345"
-uvx iroh_send.py documents/ photos/ notes.txt presentation.pptx
+uv run iroh_send.py documents/ photos/ notes.txt presentation.pptx
 ```
 
 ### Transfer with verbose logging
@@ -107,7 +107,7 @@ uvx iroh_send.py documents/ photos/ notes.txt presentation.pptx
 Sender:
 ```bash
 export IROH_SEND_TOKEN="my-unique-token-12345"
-uvx iroh_send.py --verbose large_project/
+uv run iroh_send.py --verbose large_project/
 ```
 
 ## How It Works
