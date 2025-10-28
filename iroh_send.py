@@ -128,8 +128,41 @@ def receiver_mode(token: str):
             sys.exit(1)
     
     print("All paths clear - ready to receive files")
-    # TODO: Implement actual file receiving
     
+    # Receive files
+    for i, item in enumerate(metadata):
+        path = Path(item['path'])
+        is_directory = item['is_directory']
+        
+        print(f"Receiving {path} ({'directory' if is_directory else 'file'})...")
+        
+        # Check again that path doesn't exist (safety check)
+        if path.exists():
+            print(f"ERROR: File/directory created during transfer: {path}")
+            node.close()
+            sys.exit(1)
+        
+        # Receive file data
+        recv_work = node.irecv(i + 1)  # Stream 0 was metadata, files start at 1
+        file_data = recv_work.wait()
+        
+        if is_directory:
+            # Extract tar archive
+            with tempfile.NamedTemporaryFile() as temp_file:
+                temp_file.write(file_data)
+                temp_file.flush()
+                
+                with tarfile.open(temp_file.name, 'r:gz') as tar:
+                    tar.extractall(path=path.parent)
+        else:
+            # Write regular file
+            path.parent.mkdir(parents=True, exist_ok=True)
+            with open(path, 'wb') as f:
+                f.write(file_data)
+        
+        print(f"Received: {path}")
+    
+    print("All files received successfully!")
     node.close()
 
 
@@ -181,8 +214,34 @@ def sender_mode(token: str, files: List[str]):
     send_work.wait()
     
     print(f"Metadata sent - ready to send files")
-    # TODO: Implement actual file sending
     
+    # Send files
+    for i, (file_path, meta) in enumerate(zip(files, metadata)):
+        path = Path(file_path)
+        is_directory = meta['is_directory']
+        
+        print(f"Sending {path} ({'directory' if is_directory else 'file'})...")
+        
+        if is_directory:
+            # Create tar archive in memory
+            with tempfile.NamedTemporaryFile() as temp_file:
+                with tarfile.open(temp_file.name, 'w:gz') as tar:
+                    tar.add(path, arcname=path.name)
+                
+                temp_file.seek(0)
+                file_data = temp_file.read()
+        else:
+            # Read regular file
+            with open(path, 'rb') as f:
+                file_data = f.read()
+        
+        # Send file data
+        send_work = node.isend(file_data, i + 1, 1000)  # Stream 0 was metadata
+        send_work.wait()
+        
+        print(f"Sent: {path}")
+    
+    print("All files sent successfully!")
     node.close()
 
 

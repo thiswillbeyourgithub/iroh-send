@@ -1,8 +1,8 @@
 # IROH_SEND.PY PROJECT ROADMAP
 
 ## PROGRESS
-- Overall completion: 60%
-- TODOs remaining: 3
+- Overall completion: 85%
+- TODOs remaining: 1
 - Active issues: 0
 
 ## OBJECTIVES
@@ -19,13 +19,13 @@
 - ADDED: fire.Fire argument handling for sender/receiver modes. STATUS: done, mode determined by presence of file arguments
 - IMPLEMENTED: File metadata exchange via JSON. STATUS: done, sender sends file info, receiver validates paths
 - ADDED: File existence validation on receiver side. STATUS: done, crashes if any target files exist
+- IMPLEMENTED: Basic file transfer functionality. STATUS: done, sends/receives files and directories
+- IMPLEMENTED: Directory compression/decompression with tar+gzip. STATUS: done, uses tempfile for memory efficiency
 
 ## IN_PROGRESS
-- IMPLEMENT: Basic file transfer functionality
+- INTEGRATE: tqdm progress bars for both modes
 
 ## TODO
-- P1: IMPLEMENT basic file transfer functionality (complexity: high)
-- P1: ADD directory compression/decompression with tar (complexity: medium)
 - P2: INTEGRATE tqdm progress bars for both modes (complexity: medium)
 
 ## DECISIONS
