@@ -280,26 +280,32 @@ def sender_mode(token: str, files: List[str], verbose: bool = False):
             sys.exit(1)
 
         if path.is_dir():
+            # Resolve "." and ".." to actual directory name to avoid conflicts on receiver
+            actual_name = path.resolve().name if path.name in (".", "..") else path.name
+
             # For directories, calculate compressed size
             logger.debug(f"Creating tar archive for directory: {path}")
             with tempfile.NamedTemporaryFile() as temp_file:
                 with tarfile.open(temp_file.name, "w:gz") as tar:
-                    tar.add(path, arcname=path.name)
+                    tar.add(path, arcname=actual_name)
 
                 temp_file.seek(0, 2)  # Seek to end
                 compressed_size = temp_file.tell()
 
             logger.debug(f"Compressed size for {path}: {compressed_size} bytes")
             metadata.append(
-                {"path": path.name, "is_directory": True, "size": compressed_size}
+                {"path": actual_name, "is_directory": True, "size": compressed_size}
             )
             total_size += compressed_size
         else:
+            # Resolve "." and ".." to actual name (though unlikely for files)
+            actual_name = path.resolve().name if path.name in (".", "..") else path.name
+
             # For files, get actual size
             file_size = path.stat().st_size
             logger.debug(f"File size for {path}: {file_size} bytes")
             metadata.append(
-                {"path": path.name, "is_directory": False, "size": file_size}
+                {"path": actual_name, "is_directory": False, "size": file_size}
             )
             total_size += file_size
 
