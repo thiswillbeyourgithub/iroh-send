@@ -28,6 +28,7 @@ import hashlib
 import tarfile
 import tempfile
 import logging
+import concurrent.futures
 from pathlib import Path
 from typing import List, Dict, Any, Tuple
 
@@ -58,6 +59,34 @@ def get_node_id_from_seed(seed: int) -> str:
     node_id = temp_node.node_id()
     temp_node.close()
     return node_id
+
+
+def wait_with_timeout(work, timeout: int = 30):
+    """Wait for work to complete with a timeout.
+
+    Parameters
+    ----------
+    work : object
+        Work object with a wait() method
+    timeout : int, optional
+        Timeout in seconds, by default 30
+
+    Returns
+    -------
+    Any
+        Result from work.wait()
+
+    Raises
+    ------
+    TimeoutError
+        If operation times out
+    """
+    with concurrent.futures.ThreadPoolExecutor(max_workers=1) as executor:
+        future = executor.submit(work.wait)
+        try:
+            return future.result(timeout=timeout)
+        except concurrent.futures.TimeoutError:
+            raise TimeoutError(f"Operation timed out after {timeout} seconds")
 
 
 def establish_connection(node: Node, node_id: str, timeout: int = 30) -> bool:
@@ -151,7 +180,12 @@ def receiver_mode(token: str, verbose: bool = False):
     # Receive metadata
     logger.debug("Starting metadata receive...")
     recv_work = node.irecv(0)
-    metadata_bytes = recv_work.wait()
+    try:
+        metadata_bytes = wait_with_timeout(recv_work, timeout=30)
+    except TimeoutError as e:
+        print(f"ERROR: {e}")
+        node.close()
+        sys.exit(1)
     logger.debug(f"Received {len(metadata_bytes)} bytes of metadata")
 
     metadata = json.loads(metadata_bytes.decode("utf-8"))
@@ -197,7 +231,12 @@ def receiver_mode(token: str, verbose: bool = False):
             # Receive file data
             logger.debug(f"Starting receive for: {path}")
             recv_work = node.irecv(0)
-            file_data = recv_work.wait()
+            try:
+                file_data = wait_with_timeout(recv_work, timeout=30)
+            except TimeoutError as e:
+                print(f"ERROR: {e}")
+                node.close()
+                sys.exit(1)
             logger.debug(f"Received {len(file_data)} bytes for: {path}")
 
             if is_directory:
@@ -329,7 +368,12 @@ def sender_mode(token: str, files: List[str], verbose: bool = False):
 
     logger.debug("Sending metadata...")
     send_work = node.isend(metadata_bytes, 0, 1000)
-    send_work.wait()
+    try:
+        wait_with_timeout(send_work, timeout=30)
+    except TimeoutError as e:
+        print(f"ERROR: {e}")
+        node.close()
+        sys.exit(1)
     logger.debug("Metadata sent successfully")
 
     print(f"Metadata sent - ready to send files")
@@ -364,7 +408,12 @@ def sender_mode(token: str, files: List[str], verbose: bool = False):
             # Send file data
             logger.debug(f"Sending {len(file_data)} bytes for: {path}")
             send_work = node.isend(file_data, 0, 1000)
-            send_work.wait()
+            try:
+                wait_with_timeout(send_work, timeout=30)
+            except TimeoutError as e:
+                print(f"ERROR: {e}")
+                node.close()
+                sys.exit(1)
             logger.debug(f"Sent successfully: {path}")
 
             # Update progress bar
