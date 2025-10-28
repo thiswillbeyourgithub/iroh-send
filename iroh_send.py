@@ -51,19 +51,19 @@ def derive_seeds(token: str) -> Tuple[int, int]:
     return sender_seed, receiver_seed
 
 
-def get_peer_id_from_seed(seed: int) -> str:
+def get_node_id_from_seed(seed: int) -> str:
     """Get the peer ID that would be generated from a given seed."""
     # Create temporary node to get its peer ID
     temp_node = Node.with_seed(1, seed=seed)
-    peer_id = temp_node.peer_id()
+    node_id = temp_node.node_id()
     temp_node.close()
-    return peer_id
+    return node_id
 
 
-def establish_connection(node: Node, peer_id: str, timeout: int = 30) -> bool:
+def establish_connection(node: Node, node_id: str, timeout: int = 30) -> bool:
     """Establish connection to peer and wait until ready."""
-    print(f"Connecting to peer {peer_id[:16]}...")
-    node.connect(peer_id, timeout)
+    print(f"Connecting to peer {node_id[:16]}...")
+    node.connect(node_id, timeout)
     
     start_time = time.time()
     while not node.is_ready():
@@ -98,14 +98,14 @@ def main(*files):
 def receiver_mode(token: str):
     """Run in receiver mode - wait for files."""
     sender_seed, receiver_seed = derive_seeds(token)
-    sender_peer_id = get_peer_id_from_seed(sender_seed)
+    sender_node_id = get_node_id_from_seed(sender_seed)
     
     # Initialize receiver node
     node = Node.with_seed(1, seed=receiver_seed)
-    print(f"Receiver node ID: {node.peer_id()}")
+    print(f"Receiver node ID: {node.node_id()}")
     
     # Connect to sender
-    if not establish_connection(node, sender_peer_id):
+    if not establish_connection(node, sender_node_id):
         print("ERROR: Failed to connect to sender")
         node.close()
         sys.exit(1)
@@ -173,14 +173,14 @@ def receiver_mode(token: str):
 def sender_mode(token: str, files: List[str]):
     """Run in sender mode - send files."""
     sender_seed, receiver_seed = derive_seeds(token)
-    receiver_peer_id = get_peer_id_from_seed(receiver_seed)
+    receiver_node_id = get_node_id_from_seed(receiver_seed)
     
     # Initialize sender node
     node = Node.with_seed(1, seed=sender_seed)
-    print(f"Sender node ID: {node.peer_id()}")
+    print(f"Sender node ID: {node.node_id()}")
     
     # Connect to receiver
-    if not establish_connection(node, receiver_peer_id):
+    if not establish_connection(node, receiver_node_id):
         print("ERROR: Failed to connect to receiver")
         node.close()
         sys.exit(1)
