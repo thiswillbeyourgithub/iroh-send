@@ -165,7 +165,8 @@ def receiver_mode(token: str, verbose: bool = False):
         path = Path(item["path"])
         logger.debug(f"Checking path: {path}")
         if path.exists():
-            print(f"ERROR: File/directory already exists: {path}")
+            item_type = "Directory" if item["is_directory"] else "File"
+            print(f"ERROR: {item_type} already exists: {path}")
             node.close()
             sys.exit(1)
 
@@ -188,7 +189,8 @@ def receiver_mode(token: str, verbose: bool = False):
 
             # Check again that path doesn't exist (safety check)
             if path.exists():
-                print(f"ERROR: File/directory created during transfer: {path}")
+                item_type = "Directory" if is_directory else "File"
+                print(f"ERROR: {item_type} created during transfer: {path}")
                 node.close()
                 sys.exit(1)
 
