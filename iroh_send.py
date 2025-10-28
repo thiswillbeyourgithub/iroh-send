@@ -315,7 +315,7 @@ def sender_mode(token: str, files: List[str], verbose: bool = False):
     )
     metadata_json = json.dumps(metadata)
     metadata_bytes = metadata_json.encode("utf-8")
-    logger.debug(f"Metadata JSON ({len(metadata_bytes)} bytes): {metadata_json}")
+    print(f"Metadata JSON ({len(metadata_bytes)} bytes): {metadata_json}")
 
     logger.debug("Sending metadata...")
     send_work = node.isend(metadata_bytes, 0, 1000)
