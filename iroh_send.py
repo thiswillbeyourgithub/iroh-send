@@ -145,7 +145,7 @@ def receiver_mode(token: str):
                 sys.exit(1)
 
             # Receive file data
-            recv_work = node.irecv(i + 1)  # Stream 0 was metadata, files start at 1
+            recv_work = node.irecv(0)
             file_data = recv_work.wait()
 
             if is_directory:
@@ -247,7 +247,7 @@ def sender_mode(token: str, files: List[str]):
                     file_data = f.read()
 
             # Send file data
-            send_work = node.isend(file_data, i + 1, 1000)  # Stream 0 was metadata
+            send_work = node.isend(file_data, 0, 1000)
             send_work.wait()
 
             # Update progress bar
