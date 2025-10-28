@@ -2,7 +2,7 @@
 
 A self-contained peer-to-peer file transfer script using [prime-iroh](https://github.com/n0-computer/iroh-ffi). Transfer files and directories directly between machines without intermediary servers.
 
-This script was developed with assistance from [aider.chat](https://github.com/Aider-AI/aider/).
+This script was developed with assistance from [aider.chat](https://github.com/Aider-AI/aider/), more specifically using [aider_builder](https://github.com/thiswillbeyourgithub/AiderBuilder).
 
 ## Features
 
@@ -17,16 +17,6 @@ This script was developed with assistance from [aider.chat](https://github.com/A
 
 - Python 3.8 or higher
 - `uv run` (part of the `uv` package manager)
-
-## Installation
-
-No installation needed! The script uses `uv run` to automatically fetch dependencies when run.
-
-If you don't have `uv` installed:
-
-```bash
-curl -LsSf https://astral.sh/uv/install.sh | sh
-```
 
 ## Usage
 
@@ -124,19 +114,8 @@ uv run iroh_send.py --verbose large_project/
 - The `IROH_SEND_TOKEN` should be kept secret and shared only between sender and receiver
 - Transfers are peer-to-peer; ensure you trust the peer you're connecting with
 - The script will refuse to overwrite existing files/directories on the receiver side
-- Use strong, unique tokens for each transfer session
 
 ## Troubleshooting
-
-### Connection timeouts
-
-- Ensure both machines can establish peer-to-peer connections (may require NAT traversal)
-- Verify both sender and receiver are using the exact same `IROH_SEND_TOKEN`
-- Try the `--verbose` flag to see detailed connection logs
-
-### File already exists error
-
-The receiver will abort if any target file/directory already exists. This prevents accidental overwrites. Move or rename existing files before receiving.
 
 ### Large directory transfers
 
