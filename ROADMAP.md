@@ -14,12 +14,13 @@
 
 ## COMPLETED
 - CREATED: iroh_send.py basic structure with uvx requirements header. STATUS: done, includes fire.Fire integration
+- IMPLEMENTED: Token parsing and seed derivation logic. STATUS: done, SHA256-based with mode suffix
 
 ## IN_PROGRESS
-- IMPLEMENT: Token parsing and seed derivation logic
+- IMPLEMENT: Basic node initialization and connection logic
 
 ## TODO
-- P0: IMPLEMENT token parsing and seed derivation logic (complexity: medium)
+- P0: IMPLEMENT basic node initialization and connection logic (complexity: medium)
 - P0: ADD fire.Fire argument handling for sender/receiver modes (complexity: low)
 - P1: IMPLEMENT file metadata exchange via JSON (complexity: medium)
 - P1: ADD file existence validation on receiver side (complexity: low)

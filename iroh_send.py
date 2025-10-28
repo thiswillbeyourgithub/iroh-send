@@ -29,11 +29,26 @@ import tarfile
 import tempfile
 import logging
 from pathlib import Path
-from typing import List, Dict, Any
+from typing import List, Dict, Any, Tuple
 
 import fire
 from tqdm import tqdm
 from prime_iroh import Node
+
+
+def derive_seeds(token: str) -> Tuple[int, int]:
+    """Derive sender and receiver seeds from token using SHA256."""
+    sender_token = token + "sender"
+    receiver_token = token + "receiver"
+    
+    sender_hash = hashlib.sha256(sender_token.encode()).digest()
+    receiver_hash = hashlib.sha256(receiver_token.encode()).digest()
+    
+    # Convert first 8 bytes to int for seed
+    sender_seed = int.from_bytes(sender_hash[:8], byteorder='big')
+    receiver_seed = int.from_bytes(receiver_hash[:8], byteorder='big')
+    
+    return sender_seed, receiver_seed
 
 
 def main(*files):
