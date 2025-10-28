@@ -280,8 +280,8 @@ def sender_mode(token: str, files: List[str], verbose: bool = False):
             sys.exit(1)
 
         if path.is_dir():
-            # Resolve "." and ".." to actual directory name to avoid conflicts on receiver
-            if path.name in (".", ".."):
+            # Resolve ".", "..", and empty string to actual directory name to avoid conflicts on receiver
+            if path.name in (".", "..", ""):
                 resolved_name = path.resolve().name
                 # Handle edge case of root directory where .name is empty
                 actual_name = resolved_name if resolved_name else "root"
@@ -303,8 +303,8 @@ def sender_mode(token: str, files: List[str], verbose: bool = False):
             )
             total_size += compressed_size
         else:
-            # Resolve "." and ".." to actual name (though unlikely for files)
-            if path.name in (".", ".."):
+            # Resolve ".", "..", and empty string to actual name (though unlikely for files)
+            if path.name in (".", "..", ""):
                 resolved_name = path.resolve().name
                 # Handle edge case of root directory where .name is empty
                 actual_name = resolved_name if resolved_name else "root"
