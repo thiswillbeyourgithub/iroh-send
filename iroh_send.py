@@ -291,7 +291,7 @@ def sender_mode(token: str, files: List[str], verbose: bool = False):
 
             logger.debug(f"Compressed size for {path}: {compressed_size} bytes")
             metadata.append(
-                {"path": str(path), "is_directory": True, "size": compressed_size}
+                {"path": path.name, "is_directory": True, "size": compressed_size}
             )
             total_size += compressed_size
         else:
@@ -299,7 +299,7 @@ def sender_mode(token: str, files: List[str], verbose: bool = False):
             file_size = path.stat().st_size
             logger.debug(f"File size for {path}: {file_size} bytes")
             metadata.append(
-                {"path": str(path), "is_directory": False, "size": file_size}
+                {"path": path.name, "is_directory": False, "size": file_size}
             )
             total_size += file_size
 
