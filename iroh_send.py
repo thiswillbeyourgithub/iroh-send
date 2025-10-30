@@ -25,7 +25,7 @@ import sys
 import json
 import time
 import hashlib
-import tarfile
+import gzip
 import tempfile
 import logging
 import concurrent.futures
@@ -239,8 +239,7 @@ def receiver_mode(token: str, verbose: bool = False):
         path = Path(item["path"])
         logger.debug(f"Checking path: {path}")
         if path.exists():
-            item_type = "Directory" if item["is_directory"] else "File"
-            print(f"ERROR: {item_type} already exists: {path}")
+            print(f"ERROR: File already exists: {path}")
             node.close()
             sys.exit(1)
 
@@ -256,51 +255,40 @@ def receiver_mode(token: str, verbose: bool = False):
     with tqdm(total=total_size, unit="B", unit_scale=True, desc="Receiving") as pbar:
         for i, item in enumerate(metadata):
             path = Path(item["path"])
-            is_directory = item["is_directory"]
-            logger.debug(
-                f"Receiving item {i + 1}/{len(metadata)}: {path} (directory={is_directory})"
-            )
+            logger.debug(f"Receiving item {i + 1}/{len(metadata)}: {path}")
 
             # Check again that path doesn't exist (safety check)
             if path.exists():
-                item_type = "Directory" if is_directory else "File"
-                print(f"ERROR: {item_type} created during transfer: {path}")
+                print(f"ERROR: File created during transfer: {path}")
                 node.close()
                 sys.exit(1)
 
-            # Receive file data
+            # Receive compressed data
             logger.debug(f"Starting receive for: {path}")
             recv_work = node.irecv(0)
             try:
-                file_data = wait_with_timeout(recv_work, timeout=30)
+                compressed_data = wait_with_timeout(recv_work, timeout=30)
             except TimeoutError as e:
                 print(f"ERROR: {e}")
                 node.close()
                 sys.exit(1)
-            logger.debug(f"Received {len(file_data)} bytes for: {path}")
+            logger.debug(
+                f"Received {len(compressed_data)} compressed bytes for: {path}"
+            )
 
-            if is_directory:
-                # Extract tar archive
-                logger.debug(f"Extracting directory archive: {path}")
-                with tempfile.NamedTemporaryFile() as temp_file:
-                    temp_file.write(file_data)
-                    temp_file.flush()
+            # Decompress
+            file_data = gzip.decompress(compressed_data)
+            logger.debug(f"Decompressed to {len(file_data)} bytes for: {path}")
 
-                    with tarfile.open(temp_file.name, "r:gz") as tar:
-                        members = tar.getmembers()
-                        logger.debug(f"Archive contains {len(members)} members")
-                        tar.extractall(path=path.parent)
-                logger.debug(f"Extracted directory: {path}")
-            else:
-                # Write regular file
-                logger.debug(f"Writing file: {path}")
-                path.parent.mkdir(parents=True, exist_ok=True)
-                with open(path, "wb") as f:
-                    f.write(file_data)
-                logger.debug(f"Wrote {len(file_data)} bytes to: {path}")
+            # Create parent directories and write file
+            logger.debug(f"Writing file: {path}")
+            path.parent.mkdir(parents=True, exist_ok=True)
+            with open(path, "wb") as f:
+                f.write(file_data)
+            logger.debug(f"Wrote {len(file_data)} bytes to: {path}")
 
             # Update progress bar
-            pbar.update(len(file_data))
+            pbar.update(len(compressed_data))
             pbar.set_postfix(file=str(path))
 
     print("All files received successfully!")
@@ -346,6 +334,8 @@ def sender_mode(token: str, files: List[str], verbose: bool = False):
     print(f"Sender ready - preparing metadata for {len(files)} items...")
 
     # Prepare metadata and calculate sizes
+    # Build a mapping from metadata index to original file path for later sending
+    file_mapping = []  # List of (original_path, metadata_dict) tuples
     metadata = []
     total_size = 0
 
@@ -359,44 +349,56 @@ def sender_mode(token: str, files: List[str], verbose: bool = False):
             sys.exit(1)
 
         if path.is_dir():
-            # Resolve ".", "..", and empty string to actual directory name to avoid conflicts on receiver
+            # Resolve directory name to handle ".", "..", and empty string
             if path.name in (".", "..", ""):
                 resolved_name = path.resolve().name
-                # Handle edge case of root directory where .name is empty
                 actual_name = resolved_name if resolved_name else "root"
             else:
                 actual_name = path.name
 
-            # For directories, calculate compressed size
-            logger.debug(f"Creating tar archive for directory: {path}")
-            with tempfile.NamedTemporaryFile() as temp_file:
-                with tarfile.open(temp_file.name, "w:gz") as tar:
-                    tar.add(path, arcname=actual_name)
+            # Walk directory tree and add each file individually
+            logger.debug(f"Walking directory tree: {path}")
+            for file_path_obj in path.rglob("*"):
+                if file_path_obj.is_file():
+                    # Calculate relative path that preserves directory structure
+                    relative_path = file_path_obj.relative_to(path.parent)
 
-                temp_file.seek(0, 2)  # Seek to end
-                compressed_size = temp_file.tell()
+                    # Read and compress file to get compressed size
+                    with open(file_path_obj, "rb") as f:
+                        file_data = f.read()
+                    compressed_data = gzip.compress(file_data)
+                    compressed_size = len(compressed_data)
 
-            logger.debug(f"Compressed size for {path}: {compressed_size} bytes")
-            metadata.append(
-                {"path": actual_name, "is_directory": True, "size": compressed_size}
-            )
-            total_size += compressed_size
+                    logger.debug(
+                        f"File {file_path_obj}: {len(file_data)} bytes -> {compressed_size} bytes compressed"
+                    )
+
+                    meta_item = {"path": str(relative_path), "size": compressed_size}
+                    metadata.append(meta_item)
+                    file_mapping.append((file_path_obj, meta_item))
+                    total_size += compressed_size
         else:
-            # Resolve ".", "..", and empty string to actual name (though unlikely for files)
+            # Resolve file name to handle edge cases
             if path.name in (".", "..", ""):
                 resolved_name = path.resolve().name
-                # Handle edge case of root directory where .name is empty
                 actual_name = resolved_name if resolved_name else "root"
             else:
                 actual_name = path.name
 
-            # For files, get actual size
-            file_size = path.stat().st_size
-            logger.debug(f"File size for {path}: {file_size} bytes")
-            metadata.append(
-                {"path": actual_name, "is_directory": False, "size": file_size}
+            # Read and compress file to get compressed size
+            with open(path, "rb") as f:
+                file_data = f.read()
+            compressed_data = gzip.compress(file_data)
+            compressed_size = len(compressed_data)
+
+            logger.debug(
+                f"File {path}: {len(file_data)} bytes -> {compressed_size} bytes compressed"
             )
-            total_size += file_size
+
+            meta_item = {"path": actual_name, "size": compressed_size}
+            metadata.append(meta_item)
+            file_mapping.append((path, meta_item))
+            total_size += compressed_size
 
     # Send metadata with version - version is included to ensure protocol compatibility
     logger.debug(
@@ -421,45 +423,35 @@ def sender_mode(token: str, files: List[str], verbose: bool = False):
 
     # Send files with progress bar
     with tqdm(total=total_size, unit="B", unit_scale=True, desc="Sending") as pbar:
-        for i, (file_path, meta) in enumerate(zip(files, metadata)):
-            path = Path(file_path)
-            is_directory = meta["is_directory"]
+        for i, (original_path, meta) in enumerate(file_mapping):
+            logger.debug(f"Sending item {i + 1}/{len(file_mapping)}: {original_path}")
+
+            # Read file
+            logger.debug(f"Reading file: {original_path}")
+            with open(original_path, "rb") as f:
+                file_data = f.read()
+            logger.debug(f"Read {len(file_data)} bytes from: {original_path}")
+
+            # Compress
+            compressed_data = gzip.compress(file_data)
             logger.debug(
-                f"Sending item {i + 1}/{len(metadata)}: {path} (directory={is_directory})"
+                f"Compressed to {len(compressed_data)} bytes for: {original_path}"
             )
 
-            if is_directory:
-                # Create tar archive in memory
-                logger.debug(f"Creating tar archive for: {path}")
-                with tempfile.NamedTemporaryFile() as temp_file:
-                    with tarfile.open(temp_file.name, "w:gz") as tar:
-                        # Use the path from metadata to ensure consistency with what receiver expects
-                        tar.add(path, arcname=meta["path"])
-
-                    temp_file.seek(0)
-                    file_data = temp_file.read()
-                logger.debug(f"Created archive of {len(file_data)} bytes for: {path}")
-            else:
-                # Read regular file
-                logger.debug(f"Reading file: {path}")
-                with open(path, "rb") as f:
-                    file_data = f.read()
-                logger.debug(f"Read {len(file_data)} bytes from: {path}")
-
-            # Send file data
-            logger.debug(f"Sending {len(file_data)} bytes for: {path}")
-            send_work = node.isend(file_data, 0, 1000)
+            # Send compressed data
+            logger.debug(f"Sending {len(compressed_data)} bytes for: {original_path}")
+            send_work = node.isend(compressed_data, 0, 1000)
             try:
                 wait_with_timeout(send_work, timeout=30)
             except TimeoutError as e:
                 print(f"ERROR: {e}")
                 node.close()
                 sys.exit(1)
-            logger.debug(f"Sent successfully: {path}")
+            logger.debug(f"Sent successfully: {original_path}")
 
             # Update progress bar
-            pbar.update(len(file_data))
-            pbar.set_postfix(file=str(path))
+            pbar.update(len(compressed_data))
+            pbar.set_postfix(file=meta["path"])
 
     print("All files sent successfully!")
     node.close()
