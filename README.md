@@ -58,7 +58,7 @@ The sender will:
 2. Connect to the receiver
 3. Send metadata about files to transfer
 4. Transfer all files/directories with progress tracking
-5. Automatically compress directories as `.tar.gz` archives
+5. Compress each file individually using LZMA compression
 
 ### Verbose Mode
 
@@ -106,8 +106,9 @@ uv run iroh_send.py --verbose large_project/
 2. **Node Creation**: Each peer creates an iroh node with their derived seed, resulting in predictable peer IDs
 3. **Connection**: Peers connect to each other using the derived peer IDs
 4. **Metadata Transfer**: Sender transmits JSON metadata describing files, sizes, and types
-5. **File Transfer**: Files are transferred sequentially with progress tracking
-6. **Directory Handling**: Directories are compressed as `.tar.gz` archives before transfer and extracted on receipt
+5. **File Transfer**: Files are compressed individually using LZMA and transferred sequentially with progress tracking
+6. **Directory Handling**: Directories are walked recursively and each file is compressed and transferred individually, preserving the directory structure
+7. **Memory Efficiency**: Files are processed one at a time - data is read, compressed, and sent individually without storing entire directories or large files in memory. This allows efficient transfer of arbitrarily large files and directories
 
 ## Security Considerations
 
@@ -117,9 +118,14 @@ uv run iroh_send.py --verbose large_project/
 
 ## Troubleshooting
 
-### Large directory transfers
+### Large files and directories
 
-Directories are compressed before transfer. Very large directories may take time to compress. The `--verbose` flag shows compression progress.
+The script is designed to handle large files and directories efficiently:
+
+- **Memory efficient**: Files are processed one at a time, so you can transfer arbitrarily large files or directories without running out of memory
+- **Streaming compression**: Each file is read, compressed with LZMA, and sent individually - no need to store all data in memory
+- **Progress tracking**: The progress bar shows real-time transfer status for all files
+- **Compression time**: Very large individual files may take time to compress using LZMA. The `--verbose` flag shows detailed transfer information including compression progress
 
 ## License
 
