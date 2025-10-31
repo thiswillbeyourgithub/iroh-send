@@ -27,6 +27,7 @@ import time
 import hashlib
 import gzip
 import tempfile
+import shutil
 import logging
 from pathlib import Path
 from typing import List, Dict, Any, Tuple
@@ -319,56 +320,74 @@ def receiver_mode(token: str, verbose: bool = False):
                 node.close()
                 sys.exit(1)
 
-            # Create parent directories
+            # Create parent directories for final destination
             path.parent.mkdir(parents=True, exist_ok=True)
 
-            # Receive and write file in chunks
-            logger.debug(f"Receiving file in {item['num_chunks']} chunks: {path}")
-            file_hasher = hashlib.sha256()
+            # Create temporary file to receive data - writes to temp first for atomicity and safety
+            temp_file = tempfile.NamedTemporaryFile(mode="wb", delete=False)
+            temp_path = Path(temp_file.name)
+            logger.debug(f"Created temporary file: {temp_path}")
 
-            with open(path, "wb") as f:
-                for chunk_idx in range(item["num_chunks"]):
-                    # Receive compressed chunk
-                    logger.debug(
-                        f"Receiving chunk {chunk_idx + 1}/{item['num_chunks']}"
-                    )
-                    recv_work = node.irecv(tag=0)
-                    compressed_chunk = recv_work.wait()
-                    logger.debug(f"Received {len(compressed_chunk)} compressed bytes")
+            try:
+                # Receive and write file in chunks to temporary file
+                logger.debug(f"Receiving file in {item['num_chunks']} chunks: {path}")
+                file_hasher = hashlib.sha256()
 
-                    # Decompress chunk using gzip
-                    chunk_data = gzip.decompress(compressed_chunk)
-                    chunk_size = len(chunk_data)
-                    logger.debug(f"Decompressed to {chunk_size} bytes")
+                with temp_file:
+                    for chunk_idx in range(item["num_chunks"]):
+                        # Receive compressed chunk
+                        logger.debug(
+                            f"Receiving chunk {chunk_idx + 1}/{item['num_chunks']}"
+                        )
+                        recv_work = node.irecv(tag=0)
+                        compressed_chunk = recv_work.wait()
+                        logger.debug(f"Received {len(compressed_chunk)} compressed bytes")
 
-                    # Write chunk to file immediately
-                    f.write(chunk_data)
+                        # Decompress chunk using gzip
+                        chunk_data = gzip.decompress(compressed_chunk)
+                        chunk_size = len(chunk_data)
+                        logger.debug(f"Decompressed to {chunk_size} bytes")
 
-                    # Update hash with chunk data
-                    file_hasher.update(chunk_data)
+                        # Write chunk to temporary file
+                        temp_file.write(chunk_data)
 
-                    # Update progress bar with uncompressed chunk size
-                    pbar.update(chunk_size)
-                    pbar.set_postfix(
-                        file=str(path), chunk=f"{chunk_idx + 1}/{item['num_chunks']}"
-                    )
+                        # Update hash with chunk data
+                        file_hasher.update(chunk_data)
 
-            logger.debug(f"Wrote complete file: {path}")
+                        # Update progress bar with uncompressed chunk size
+                        pbar.update(chunk_size)
+                        pbar.set_postfix(
+                            file=str(path), chunk=f"{chunk_idx + 1}/{item['num_chunks']}"
+                        )
 
-            # Verify SHA256 hash to ensure file integrity after transfer
-            received_hash = file_hasher.hexdigest()
-            expected_hash = item["sha256"]
-            logger.debug(
-                f"Hash verification for {path}: received={received_hash}, expected={expected_hash}"
-            )
-            if received_hash != expected_hash:
-                logger.error(f"Hash mismatch for {path}! Deleting file.")
-                path.unlink()  # Delete the corrupted file
-                print(f"ERROR: Hash mismatch for {path}!")
-                print(f"  Expected: {expected_hash}")
-                print(f"  Received: {received_hash}")
-                node.close()
-                sys.exit(1)
+                logger.debug(f"Wrote complete file to temp: {temp_path}")
+
+                # Verify SHA256 hash to ensure file integrity after transfer
+                received_hash = file_hasher.hexdigest()
+                expected_hash = item["sha256"]
+                logger.debug(
+                    f"Hash verification for {path}: received={received_hash}, expected={expected_hash}"
+                )
+                if received_hash != expected_hash:
+                    logger.error(f"Hash mismatch for {path}! Deleting temp file.")
+                    temp_path.unlink()  # Delete the corrupted temp file
+                    print(f"ERROR: Hash mismatch for {path}!")
+                    print(f"  Expected: {expected_hash}")
+                    print(f"  Received: {received_hash}")
+                    node.close()
+                    sys.exit(1)
+
+                # Hash verified - move temp file to final destination atomically
+                logger.debug(f"Moving {temp_path} to {path}")
+                shutil.move(str(temp_path), str(path))
+                logger.debug(f"Successfully moved file to: {path}")
+
+            except Exception as e:
+                # Clean up temp file on any error
+                if temp_path.exists():
+                    logger.error(f"Error during transfer, cleaning up temp file: {temp_path}")
+                    temp_path.unlink()
+                raise
 
     print("All files received successfully!")
     node.close()
