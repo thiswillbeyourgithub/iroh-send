@@ -37,7 +37,7 @@ from tqdm import tqdm
 from prime_iroh import Node
 
 # Version of the protocol - sender and receiver must match
-VERSION = "2.1.0"
+VERSION = "2.1.1"
 
 # Chunk size for file transfers (5 MB) - files are sent/received in chunks to allow streaming
 CHUNK_SIZE = 1024 * 1024 * 5
