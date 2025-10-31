@@ -42,6 +42,56 @@ VERSION = "2.0.5"
 CHUNK_SIZE = 1024 * 1024
 
 
+def parse_size(size_str: str) -> int:
+    """Parse size string like '1k', '1.5m', '3g' into bytes.
+
+    Supports suffixes: k/K (kilobytes), m/M (megabytes), g/G (gigabytes).
+    Plain numbers without suffix are treated as bytes.
+
+    Parameters
+    ----------
+    size_str : str
+        Size string to parse (e.g., "1k", "1.5M", "3.0g", "1024")
+
+    Returns
+    -------
+    int
+        Size in bytes
+
+    Raises
+    ------
+    ValueError
+        If size string format is invalid
+    """
+    size_str = size_str.strip()
+
+    # Check if there's a suffix
+    if size_str and size_str[-1].lower() in ("k", "m", "g"):
+        suffix = size_str[-1].lower()
+        number_str = size_str[:-1]
+    else:
+        # No suffix, treat as bytes
+        try:
+            return int(float(size_str))
+        except ValueError:
+            raise ValueError(f"Invalid size format: {size_str}")
+
+    # Parse the number part
+    try:
+        number = float(number_str)
+    except ValueError:
+        raise ValueError(f"Invalid size format: {size_str}")
+
+    # Convert to bytes based on suffix - k=1024, m=1024^2, g=1024^3
+    multipliers = {
+        "k": 1024,
+        "m": 1024 * 1024,
+        "g": 1024 * 1024 * 1024,
+    }
+
+    return int(number * multipliers[suffix])
+
+
 def derive_seeds(token: str) -> Tuple[int, int]:
     """Derive sender and receiver seeds from token using SHA256."""
     sender_token = token + "sender"
@@ -96,7 +146,7 @@ def establish_connection(node: Node, node_id: str, num_retries: int = 30) -> boo
     return True
 
 
-def main(*files, verbose: bool = False, latency: int = 1000):
+def main(*files, verbose: bool = False, latency: int = 1000, chunk_size: str = "1m"):
     """Main entry point for iroh_send script.
 
     Parameters
@@ -107,6 +157,8 @@ def main(*files, verbose: bool = False, latency: int = 1000):
         Enable verbose debug logging, by default False
     latency : int, optional
         Latency parameter for send operations in milliseconds, by default 1000
+    chunk_size : str, optional
+        Chunk size for file transfers (e.g., "1k", "1.5m", "3g"), by default "1m"
     """
     # Initialize logging with appropriate level based on verbose flag
     log_level = logging.DEBUG if verbose else logging.INFO
@@ -126,13 +178,21 @@ def main(*files, verbose: bool = False, latency: int = 1000):
         print("ERROR: IROH_SEND_TOKEN environment variable not set")
         sys.exit(1)
 
+    # Parse chunk size - this determines how files are split into chunks for transfer
+    try:
+        chunk_size_bytes = parse_size(chunk_size)
+        logger.debug(f"Chunk size: {chunk_size_bytes} bytes ({chunk_size})")
+    except ValueError as e:
+        print(f"ERROR: {e}")
+        sys.exit(1)
+
     # Determine mode based on arguments
     if not files:
         print("Running in receiver mode...")
         receiver_mode(token, verbose)
     else:
         print(f"Running in sender mode with {len(files)} items...")
-        sender_mode(token, list(files), verbose, latency)
+        sender_mode(token, list(files), verbose, latency, chunk_size_bytes)
 
 
 def receiver_mode(token: str, verbose: bool = False):
@@ -309,7 +369,11 @@ def receiver_mode(token: str, verbose: bool = False):
 
 
 def sender_mode(
-    token: str, files: List[str], verbose: bool = False, latency: int = 1000
+    token: str,
+    files: List[str],
+    verbose: bool = False,
+    latency: int = 1000,
+    chunk_size: int = CHUNK_SIZE,
 ):
     """Run in sender mode - send files.
 
@@ -323,6 +387,8 @@ def sender_mode(
         Enable verbose debug logging, by default False
     latency : int, optional
         Latency parameter for send operations in milliseconds, by default 1000
+    chunk_size : int, optional
+        Chunk size in bytes for splitting files, by default CHUNK_SIZE
     """
     logger = logging.getLogger(__name__)
 
@@ -392,8 +458,8 @@ def sender_mode(
                     )
 
                     num_chunks = (
-                        file_size + CHUNK_SIZE - 1
-                    ) // CHUNK_SIZE  # Ceiling division
+                        file_size + chunk_size - 1
+                    ) // chunk_size  # Ceiling division
                     meta_item = {
                         "path": str(relative_path),
                         "size": file_size,
@@ -420,7 +486,7 @@ def sender_mode(
 
             logger.debug(f"File {path}: {file_size} bytes, SHA256: {file_hash}")
 
-            num_chunks = (file_size + CHUNK_SIZE - 1) // CHUNK_SIZE  # Ceiling division
+            num_chunks = (file_size + chunk_size - 1) // chunk_size  # Ceiling division
             meta_item = {
                 "path": actual_name,
                 "size": file_size,
@@ -459,7 +525,7 @@ def sender_mode(
             with open(original_path, "rb") as f:
                 for chunk_idx in range(meta["num_chunks"]):
                     # Read chunk
-                    chunk_data = f.read(CHUNK_SIZE)
+                    chunk_data = f.read(chunk_size)
                     chunk_size = len(chunk_data)
                     logger.debug(
                         f"Read chunk {chunk_idx + 1}/{meta['num_chunks']}: {chunk_size} bytes"
