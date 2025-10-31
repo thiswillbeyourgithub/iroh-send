@@ -122,7 +122,7 @@ def establish_connection(node: Node, node_id: str, num_retries: int = 30) -> boo
     return True
 
 
-def main(*files, verbose: bool = False):
+def main(*files, verbose: bool = False, latency: int = 1000):
     """Main entry point for iroh_send script.
 
     Parameters
@@ -131,6 +131,8 @@ def main(*files, verbose: bool = False):
         Files or directories to send (sender mode). If empty, runs in receiver mode.
     verbose : bool, optional
         Enable verbose debug logging, by default False
+    latency : int, optional
+        Latency parameter for send operations in milliseconds, by default 1000
     """
     # Initialize logging with appropriate level based on verbose flag
     log_level = logging.DEBUG if verbose else logging.INFO
@@ -156,7 +158,7 @@ def main(*files, verbose: bool = False):
         receiver_mode(token, verbose)
     else:
         print(f"Running in sender mode with {len(files)} items...")
-        sender_mode(token, list(files), verbose)
+        sender_mode(token, list(files), verbose, latency)
 
 
 def receiver_mode(token: str, verbose: bool = False):
@@ -310,7 +312,9 @@ def receiver_mode(token: str, verbose: bool = False):
     node.close()
 
 
-def sender_mode(token: str, files: List[str], verbose: bool = False):
+def sender_mode(
+    token: str, files: List[str], verbose: bool = False, latency: int = 1000
+):
     """Run in sender mode - send files.
 
     Parameters
@@ -321,6 +325,8 @@ def sender_mode(token: str, files: List[str], verbose: bool = False):
         List of file/directory paths to send
     verbose : bool, optional
         Enable verbose debug logging, by default False
+    latency : int, optional
+        Latency parameter for send operations in milliseconds, by default 1000
     """
     logger = logging.getLogger(__name__)
 
@@ -425,7 +431,7 @@ def sender_mode(token: str, files: List[str], verbose: bool = False):
     print(f"Metadata JSON ({len(metadata_bytes)} bytes): {metadata_json}")
 
     logger.debug("Sending metadata...")
-    send_work = node.isend(msg=metadata_bytes, tag=0, latency=1000)
+    send_work = node.isend(msg=metadata_bytes, tag=0, latency=latency)
     try:
         wait_with_timeout(send_work, timeout=30)
     except TimeoutError as e:
@@ -455,7 +461,7 @@ def sender_mode(token: str, files: List[str], verbose: bool = False):
 
             # Send compressed data
             logger.debug(f"Sending {len(compressed_data)} bytes for: {original_path}")
-            send_work = node.isend(msg=compressed_data, tag=0, latency=1000)
+            send_work = node.isend(msg=compressed_data, tag=0, latency=latency)
             try:
                 wait_with_timeout(send_work, timeout=30)
             except TimeoutError as e:
