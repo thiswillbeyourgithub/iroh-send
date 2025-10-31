@@ -341,7 +341,9 @@ def receiver_mode(token: str, verbose: bool = False):
                         )
                         recv_work = node.irecv(tag=0)
                         compressed_chunk = recv_work.wait()
-                        logger.debug(f"Received {len(compressed_chunk)} compressed bytes")
+                        logger.debug(
+                            f"Received {len(compressed_chunk)} compressed bytes"
+                        )
 
                         # Decompress chunk using gzip
                         chunk_data = gzip.decompress(compressed_chunk)
@@ -357,7 +359,8 @@ def receiver_mode(token: str, verbose: bool = False):
                         # Update progress bar with uncompressed chunk size
                         pbar.update(chunk_size)
                         pbar.set_postfix(
-                            file=str(path), chunk=f"{chunk_idx + 1}/{item['num_chunks']}"
+                            file=str(path),
+                            chunk=f"{chunk_idx + 1}/{item['num_chunks']}",
                         )
 
                 logger.debug(f"Wrote complete file to temp: {temp_path}")
@@ -385,7 +388,9 @@ def receiver_mode(token: str, verbose: bool = False):
             except Exception as e:
                 # Clean up temp file on any error
                 if temp_path.exists():
-                    logger.error(f"Error during transfer, cleaning up temp file: {temp_path}")
+                    logger.error(
+                        f"Error during transfer, cleaning up temp file: {temp_path}"
+                    )
                     temp_path.unlink()
                 raise
 
