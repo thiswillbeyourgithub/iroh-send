@@ -92,14 +92,29 @@ def wait_with_timeout(work, timeout: int = 30):
             raise TimeoutError(f"Operation timed out after {timeout} seconds")
 
 
-def establish_connection(node: Node, node_id: str, timeout: int = 30) -> bool:
-    """Establish connection to peer and wait until ready."""
+def establish_connection(node: Node, node_id: str, num_retries: int = 30) -> bool:
+    """Establish connection to peer and wait until ready.
+
+    Parameters
+    ----------
+    node : Node
+        The node to establish connection from
+    node_id : str
+        The peer ID to connect to
+    num_retries : int, optional
+        Number of connection retries and also seconds to wait for ready state, by default 30
+
+    Returns
+    -------
+    bool
+        True if connection established and ready, False if timed out
+    """
     print(f"Connecting to peer {node_id[:16]}...")
-    node.connect(peer_id_str=node_id, num_retries=timeout)
+    node.connect(peer_id_str=node_id, num_retries=num_retries)
 
     start_time = time.time()
     while not node.is_ready():
-        if time.time() - start_time > timeout:
+        if time.time() - start_time > num_retries:
             return False
         time.sleep(0.1)
 
@@ -173,7 +188,7 @@ def receiver_mode(token: str, verbose: bool = False):
 
     # Connect to sender
     logger.debug(f"Attempting to connect to sender: {sender_node_id}")
-    if not establish_connection(node, sender_node_id):
+    if not establish_connection(node=node, node_id=sender_node_id, num_retries=30):
         print("ERROR: Failed to connect to sender")
         node.close()
         sys.exit(1)
@@ -326,7 +341,7 @@ def sender_mode(token: str, files: List[str], verbose: bool = False):
 
     # Connect to receiver
     logger.debug(f"Attempting to connect to receiver: {receiver_node_id}")
-    if not establish_connection(node, receiver_node_id):
+    if not establish_connection(node=node, node_id=receiver_node_id, num_retries=30):
         print("ERROR: Failed to connect to receiver")
         node.close()
         sys.exit(1)
