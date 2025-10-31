@@ -25,7 +25,7 @@ import sys
 import json
 import time
 import hashlib
-import lzma
+import gzip
 import tempfile
 import logging
 import concurrent.futures
@@ -293,8 +293,8 @@ def receiver_mode(token: str, verbose: bool = False):
                 f"Received {len(compressed_data)} compressed bytes for: {path}"
             )
 
-            # Decompress using LZMA
-            file_data = lzma.decompress(compressed_data)
+            # Decompress using gzip
+            file_data = gzip.decompress(compressed_data)
             logger.debug(f"Decompressed to {len(file_data)} bytes for: {path}")
 
             # Create parent directories and write file
@@ -399,12 +399,12 @@ def sender_mode(
                     # Calculate relative path that preserves directory structure
                     relative_path = file_path_obj.relative_to(path.parent)
 
-                    # Read and compress file to get compressed size using LZMA
+                    # Read and compress file to get compressed size using gzip
                     with open(file_path_obj, "rb") as f:
                         file_data = f.read()
                     # Compute SHA256 hash of the original file data to verify integrity after transfer
                     file_hash = hashlib.sha256(file_data).hexdigest()
-                    compressed_data = lzma.compress(file_data)
+                    compressed_data = gzip.compress(file_data)
                     compressed_size = len(compressed_data)
 
                     logger.debug(
@@ -427,12 +427,12 @@ def sender_mode(
             else:
                 actual_name = path.name
 
-            # Read and compress file to get compressed size using LZMA
+            # Read and compress file to get compressed size using gzip
             with open(path, "rb") as f:
                 file_data = f.read()
             # Compute SHA256 hash of the original file data to verify integrity after transfer
             file_hash = hashlib.sha256(file_data).hexdigest()
-            compressed_data = lzma.compress(file_data)
+            compressed_data = gzip.compress(file_data)
             compressed_size = len(compressed_data)
 
             logger.debug(
@@ -480,8 +480,8 @@ def sender_mode(
                 file_data = f.read()
             logger.debug(f"Read {len(file_data)} bytes from: {original_path}")
 
-            # Compress using LZMA
-            compressed_data = lzma.compress(file_data)
+            # Compress using gzip
+            compressed_data = gzip.compress(file_data)
             logger.debug(
                 f"Compressed to {len(compressed_data)} bytes for: {original_path}"
             )
