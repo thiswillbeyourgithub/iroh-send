@@ -146,7 +146,7 @@ def establish_connection(node: Node, node_id: str, num_retries: int = 30) -> boo
     return True
 
 
-def main(*files, verbose: bool = False, latency: int = 1000, chunk_size: str = "1m"):
+def main(*files, verbose: bool = False, latency: int = 100, chunk_size: str = "1m"):
     """Main entry point for iroh_send script.
 
     Parameters
@@ -156,7 +156,7 @@ def main(*files, verbose: bool = False, latency: int = 1000, chunk_size: str = "
     verbose : bool, optional
         Enable verbose debug logging, by default False
     latency : int, optional
-        Latency parameter for send operations in milliseconds, by default 1000
+        Latency parameter for send operations in milliseconds, by default 100
     chunk_size : str, optional
         Chunk size for file transfers (e.g., "1k", "1.5m", "3g"), by default "1m"
     """
@@ -372,7 +372,7 @@ def sender_mode(
     token: str,
     files: List[str],
     verbose: bool = False,
-    latency: int = 1000,
+    latency: int = 100,
     chunk_size: int = CHUNK_SIZE,
 ):
     """Run in sender mode - send files.
@@ -386,7 +386,7 @@ def sender_mode(
     verbose : bool, optional
         Enable verbose debug logging, by default False
     latency : int, optional
-        Latency parameter for send operations in milliseconds, by default 1000
+        Latency parameter for send operations in milliseconds, by default 100
     chunk_size : int, optional
         Chunk size in bytes for splitting files, by default CHUNK_SIZE
     """
