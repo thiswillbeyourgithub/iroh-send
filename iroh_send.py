@@ -280,8 +280,8 @@ def receiver_mode(token: str, verbose: bool = False):
                 node.close()
                 sys.exit(1)
 
-            # Update progress bar
-            pbar.update(len(compressed_data))
+            # Update progress bar with uncompressed size
+            pbar.update(len(file_data))
             pbar.set_postfix(file=str(path))
 
     print("All files received successfully!")
@@ -360,26 +360,25 @@ def sender_mode(
                     # Calculate relative path that preserves directory structure
                     relative_path = file_path_obj.relative_to(path.parent)
 
-                    # Read and compress file to get compressed size using gzip
+                    # Read file to get size and hash
                     with open(file_path_obj, "rb") as f:
                         file_data = f.read()
                     # Compute SHA256 hash of the original file data to verify integrity after transfer
                     file_hash = hashlib.sha256(file_data).hexdigest()
-                    compressed_data = gzip.compress(file_data)
-                    compressed_size = len(compressed_data)
+                    file_size = len(file_data)
 
                     logger.debug(
-                        f"File {file_path_obj}: {len(file_data)} bytes -> {compressed_size} bytes compressed, SHA256: {file_hash}"
+                        f"File {file_path_obj}: {file_size} bytes, SHA256: {file_hash}"
                     )
 
                     meta_item = {
                         "path": str(relative_path),
-                        "size": compressed_size,
+                        "size": file_size,
                         "sha256": file_hash,
                     }
                     metadata.append(meta_item)
                     file_mapping.append((file_path_obj, meta_item))
-                    total_size += compressed_size
+                    total_size += file_size
         else:
             # Resolve file name to handle edge cases
             if path.name in (".", "..", ""):
@@ -388,26 +387,23 @@ def sender_mode(
             else:
                 actual_name = path.name
 
-            # Read and compress file to get compressed size using gzip
+            # Read file to get size and hash
             with open(path, "rb") as f:
                 file_data = f.read()
             # Compute SHA256 hash of the original file data to verify integrity after transfer
             file_hash = hashlib.sha256(file_data).hexdigest()
-            compressed_data = gzip.compress(file_data)
-            compressed_size = len(compressed_data)
+            file_size = len(file_data)
 
-            logger.debug(
-                f"File {path}: {len(file_data)} bytes -> {compressed_size} bytes compressed, SHA256: {file_hash}"
-            )
+            logger.debug(f"File {path}: {file_size} bytes, SHA256: {file_hash}")
 
             meta_item = {
                 "path": actual_name,
-                "size": compressed_size,
+                "size": file_size,
                 "sha256": file_hash,
             }
             metadata.append(meta_item)
             file_mapping.append((path, meta_item))
-            total_size += compressed_size
+            total_size += file_size
 
     # Send metadata with version - version is included to ensure protocol compatibility
     logger.debug(
@@ -448,8 +444,8 @@ def sender_mode(
             send_work.wait()
             logger.debug(f"Sent successfully: {original_path}")
 
-            # Update progress bar
-            pbar.update(len(compressed_data))
+            # Update progress bar with uncompressed size
+            pbar.update(len(file_data))
             pbar.set_postfix(file=meta["path"])
 
     print("All files sent successfully!")
