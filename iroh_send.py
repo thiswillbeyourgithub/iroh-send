@@ -37,7 +37,7 @@ from tqdm import tqdm
 from prime_iroh import Node
 
 # Version of the protocol - sender and receiver must match
-VERSION = "2.0.0"
+VERSION = "2.0.1"
 
 
 def derive_seeds(token: str) -> Tuple[int, int]:
