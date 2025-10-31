@@ -37,7 +37,7 @@ from tqdm import tqdm
 from prime_iroh import Node
 
 # Version of the protocol - sender and receiver must match
-VERSION = "2.0.1"
+VERSION = "2.1.0"
 
 
 def derive_seeds(token: str) -> Tuple[int, int]:
@@ -304,6 +304,21 @@ def receiver_mode(token: str, verbose: bool = False):
                 f.write(file_data)
             logger.debug(f"Wrote {len(file_data)} bytes to: {path}")
 
+            # Verify SHA256 hash to ensure file integrity after transfer
+            received_hash = hashlib.sha256(file_data).hexdigest()
+            expected_hash = item["sha256"]
+            logger.debug(
+                f"Hash verification for {path}: received={received_hash}, expected={expected_hash}"
+            )
+            if received_hash != expected_hash:
+                logger.error(f"Hash mismatch for {path}! Deleting file.")
+                path.unlink()  # Delete the corrupted file
+                print(f"ERROR: Hash mismatch for {path}!")
+                print(f"  Expected: {expected_hash}")
+                print(f"  Received: {received_hash}")
+                node.close()
+                sys.exit(1)
+
             # Update progress bar
             pbar.update(len(compressed_data))
             pbar.set_postfix(file=str(path))
@@ -387,14 +402,20 @@ def sender_mode(
                     # Read and compress file to get compressed size using LZMA
                     with open(file_path_obj, "rb") as f:
                         file_data = f.read()
+                    # Compute SHA256 hash of the original file data to verify integrity after transfer
+                    file_hash = hashlib.sha256(file_data).hexdigest()
                     compressed_data = lzma.compress(file_data)
                     compressed_size = len(compressed_data)
 
                     logger.debug(
-                        f"File {file_path_obj}: {len(file_data)} bytes -> {compressed_size} bytes compressed"
+                        f"File {file_path_obj}: {len(file_data)} bytes -> {compressed_size} bytes compressed, SHA256: {file_hash}"
                     )
 
-                    meta_item = {"path": str(relative_path), "size": compressed_size}
+                    meta_item = {
+                        "path": str(relative_path),
+                        "size": compressed_size,
+                        "sha256": file_hash,
+                    }
                     metadata.append(meta_item)
                     file_mapping.append((file_path_obj, meta_item))
                     total_size += compressed_size
@@ -409,14 +430,20 @@ def sender_mode(
             # Read and compress file to get compressed size using LZMA
             with open(path, "rb") as f:
                 file_data = f.read()
+            # Compute SHA256 hash of the original file data to verify integrity after transfer
+            file_hash = hashlib.sha256(file_data).hexdigest()
             compressed_data = lzma.compress(file_data)
             compressed_size = len(compressed_data)
 
             logger.debug(
-                f"File {path}: {len(file_data)} bytes -> {compressed_size} bytes compressed"
+                f"File {path}: {len(file_data)} bytes -> {compressed_size} bytes compressed, SHA256: {file_hash}"
             )
 
-            meta_item = {"path": actual_name, "size": compressed_size}
+            meta_item = {
+                "path": actual_name,
+                "size": compressed_size,
+                "sha256": file_hash,
+            }
             metadata.append(meta_item)
             file_mapping.append((path, meta_item))
             total_size += compressed_size
