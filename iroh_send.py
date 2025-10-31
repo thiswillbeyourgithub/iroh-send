@@ -378,10 +378,10 @@ def sender_mode(token: str, files: List[str], verbose: bool = False):
                     # Calculate relative path that preserves directory structure
                     relative_path = file_path_obj.relative_to(path.parent)
 
-                    # Read and compress file to get compressed size using LZMA with maximum compression
+                    # Read and compress file to get compressed size using LZMA
                     with open(file_path_obj, "rb") as f:
                         file_data = f.read()
-                    compressed_data = lzma.compress(file_data, preset=9)
+                    compressed_data = lzma.compress(file_data)
                     compressed_size = len(compressed_data)
 
                     logger.debug(
@@ -400,10 +400,10 @@ def sender_mode(token: str, files: List[str], verbose: bool = False):
             else:
                 actual_name = path.name
 
-            # Read and compress file to get compressed size using LZMA with maximum compression
+            # Read and compress file to get compressed size using LZMA
             with open(path, "rb") as f:
                 file_data = f.read()
-            compressed_data = lzma.compress(file_data, preset=9)
+            compressed_data = lzma.compress(file_data)
             compressed_size = len(compressed_data)
 
             logger.debug(
@@ -447,8 +447,8 @@ def sender_mode(token: str, files: List[str], verbose: bool = False):
                 file_data = f.read()
             logger.debug(f"Read {len(file_data)} bytes from: {original_path}")
 
-            # Compress using LZMA with maximum compression (preset=9)
-            compressed_data = lzma.compress(file_data, preset=9)
+            # Compress using LZMA
+            compressed_data = lzma.compress(file_data)
             logger.debug(
                 f"Compressed to {len(compressed_data)} bytes for: {original_path}"
             )
