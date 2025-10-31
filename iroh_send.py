@@ -28,7 +28,6 @@ import hashlib
 import gzip
 import tempfile
 import logging
-import concurrent.futures
 from pathlib import Path
 from typing import List, Dict, Any, Tuple
 
@@ -62,34 +61,6 @@ def get_node_id_from_seed(seed: int) -> str:
     node_id = temp_node.node_id()
     temp_node.close()
     return node_id
-
-
-def wait_with_timeout(work, timeout: int = 30):
-    """Wait for work to complete with a timeout.
-
-    Parameters
-    ----------
-    work : object
-        Work object with a wait() method
-    timeout : int, optional
-        Timeout in seconds, by default 30
-
-    Returns
-    -------
-    Any
-        Result from work.wait()
-
-    Raises
-    ------
-    TimeoutError
-        If operation times out
-    """
-    with concurrent.futures.ThreadPoolExecutor(max_workers=1) as executor:
-        future = executor.submit(work.wait)
-        try:
-            return future.result(timeout=timeout)
-        except concurrent.futures.TimeoutError:
-            raise TimeoutError(f"Operation timed out after {timeout} seconds")
 
 
 def establish_connection(node: Node, node_id: str, num_retries: int = 30) -> bool:
@@ -200,12 +171,7 @@ def receiver_mode(token: str, verbose: bool = False):
     # Receive metadata
     logger.debug("Starting metadata receive...")
     recv_work = node.irecv(tag=0)
-    try:
-        metadata_bytes = wait_with_timeout(recv_work, timeout=30)
-    except TimeoutError as e:
-        print(f"ERROR: {e}")
-        node.close()
-        sys.exit(1)
+    metadata_bytes = recv_work.wait()
     logger.debug(f"Received {len(metadata_bytes)} bytes of metadata")
 
     metadata_wrapper = json.loads(metadata_bytes.decode("utf-8"))
@@ -283,12 +249,7 @@ def receiver_mode(token: str, verbose: bool = False):
             # Receive compressed data
             logger.debug(f"Starting receive for: {path}")
             recv_work = node.irecv(tag=0)
-            try:
-                compressed_data = wait_with_timeout(recv_work, timeout=30)
-            except TimeoutError as e:
-                print(f"ERROR: {e}")
-                node.close()
-                sys.exit(1)
+            compressed_data = recv_work.wait()
             logger.debug(
                 f"Received {len(compressed_data)} compressed bytes for: {path}"
             )
@@ -459,12 +420,7 @@ def sender_mode(
 
     logger.debug("Sending metadata...")
     send_work = node.isend(msg=metadata_bytes, tag=0, latency=latency)
-    try:
-        wait_with_timeout(send_work, timeout=30)
-    except TimeoutError as e:
-        print(f"ERROR: {e}")
-        node.close()
-        sys.exit(1)
+    send_work.wait()
     logger.debug("Metadata sent successfully")
 
     print(f"Metadata sent - ready to send files")
@@ -489,12 +445,7 @@ def sender_mode(
             # Send compressed data
             logger.debug(f"Sending {len(compressed_data)} bytes for: {original_path}")
             send_work = node.isend(msg=compressed_data, tag=0, latency=latency)
-            try:
-                wait_with_timeout(send_work, timeout=30)
-            except TimeoutError as e:
-                print(f"ERROR: {e}")
-                node.close()
-                sys.exit(1)
+            send_work.wait()
             logger.debug(f"Sent successfully: {original_path}")
 
             # Update progress bar
