@@ -38,6 +38,9 @@ from prime_iroh import Node
 # Version of the protocol - sender and receiver must match
 VERSION = "2.0.5"
 
+# Chunk size for file transfers (1 MB) - files are sent/received in chunks to allow streaming
+CHUNK_SIZE = 1024 * 1024
+
 
 def derive_seeds(token: str) -> Tuple[int, int]:
     """Derive sender and receiver seeds from token using SHA256."""
@@ -250,27 +253,40 @@ def receiver_mode(token: str, verbose: bool = False):
                 node.close()
                 sys.exit(1)
 
-            # Receive compressed data
-            logger.debug(f"Starting receive for: {path}")
-            recv_work = node.irecv(tag=0)
-            compressed_data = recv_work.wait()
-            logger.debug(
-                f"Received {len(compressed_data)} compressed bytes for: {path}"
-            )
-
-            # Decompress using gzip
-            file_data = gzip.decompress(compressed_data)
-            logger.debug(f"Decompressed to {len(file_data)} bytes for: {path}")
-
-            # Create parent directories and write file
-            logger.debug(f"Writing file: {path}")
+            # Create parent directories
             path.parent.mkdir(parents=True, exist_ok=True)
+            
+            # Receive and write file in chunks
+            logger.debug(f"Receiving file in {item['num_chunks']} chunks: {path}")
+            file_hasher = hashlib.sha256()
+            
             with open(path, "wb") as f:
-                f.write(file_data)
-            logger.debug(f"Wrote {len(file_data)} bytes to: {path}")
+                for chunk_idx in range(item['num_chunks']):
+                    # Receive compressed chunk
+                    logger.debug(f"Receiving chunk {chunk_idx + 1}/{item['num_chunks']}")
+                    recv_work = node.irecv(tag=0)
+                    compressed_chunk = recv_work.wait()
+                    logger.debug(f"Received {len(compressed_chunk)} compressed bytes")
+                    
+                    # Decompress chunk using gzip
+                    chunk_data = gzip.decompress(compressed_chunk)
+                    chunk_size = len(chunk_data)
+                    logger.debug(f"Decompressed to {chunk_size} bytes")
+                    
+                    # Write chunk to file immediately
+                    f.write(chunk_data)
+                    
+                    # Update hash with chunk data
+                    file_hasher.update(chunk_data)
+                    
+                    # Update progress bar with uncompressed chunk size
+                    pbar.update(chunk_size)
+                    pbar.set_postfix(file=str(path), chunk=f"{chunk_idx + 1}/{item['num_chunks']}")
+            
+            logger.debug(f"Wrote complete file: {path}")
 
             # Verify SHA256 hash to ensure file integrity after transfer
-            received_hash = hashlib.sha256(file_data).hexdigest()
+            received_hash = file_hasher.hexdigest()
             expected_hash = item["sha256"]
             logger.debug(
                 f"Hash verification for {path}: received={received_hash}, expected={expected_hash}"
@@ -283,10 +299,6 @@ def receiver_mode(token: str, verbose: bool = False):
                 print(f"  Received: {received_hash}")
                 node.close()
                 sys.exit(1)
-
-            # Update progress bar with uncompressed size
-            pbar.update(len(file_data))
-            pbar.set_postfix(file=str(path))
 
     print("All files received successfully!")
     node.close()
@@ -400,10 +412,12 @@ def sender_mode(
 
             logger.debug(f"File {path}: {file_size} bytes, SHA256: {file_hash}")
 
+            num_chunks = (file_size + CHUNK_SIZE - 1) // CHUNK_SIZE  # Ceiling division
             meta_item = {
                 "path": actual_name,
                 "size": file_size,
                 "sha256": file_hash,
+                "num_chunks": num_chunks,
             }
             metadata.append(meta_item)
             file_mapping.append((path, meta_item))
@@ -430,27 +444,27 @@ def sender_mode(
         for i, (original_path, meta) in enumerate(file_mapping):
             logger.debug(f"Sending item {i + 1}/{len(file_mapping)}: {original_path}")
 
-            # Read file
-            logger.debug(f"Reading file: {original_path}")
+            # Send file in chunks
+            logger.debug(f"Sending file in {meta['num_chunks']} chunks: {original_path}")
             with open(original_path, "rb") as f:
-                file_data = f.read()
-            logger.debug(f"Read {len(file_data)} bytes from: {original_path}")
-
-            # Compress using gzip
-            compressed_data = gzip.compress(file_data)
-            logger.debug(
-                f"Compressed to {len(compressed_data)} bytes for: {original_path}"
-            )
-
-            # Send compressed data
-            logger.debug(f"Sending {len(compressed_data)} bytes for: {original_path}")
-            send_work = node.isend(msg=compressed_data, tag=0, latency=latency)
-            send_work.wait()
-            logger.debug(f"Sent successfully: {original_path}")
-
-            # Update progress bar with uncompressed size
-            pbar.update(len(file_data))
-            pbar.set_postfix(file=meta["path"])
+                for chunk_idx in range(meta['num_chunks']):
+                    # Read chunk
+                    chunk_data = f.read(CHUNK_SIZE)
+                    chunk_size = len(chunk_data)
+                    logger.debug(f"Read chunk {chunk_idx + 1}/{meta['num_chunks']}: {chunk_size} bytes")
+                    
+                    # Compress chunk using gzip
+                    compressed_chunk = gzip.compress(chunk_data)
+                    logger.debug(f"Compressed chunk to {len(compressed_chunk)} bytes")
+                    
+                    # Send compressed chunk
+                    send_work = node.isend(msg=compressed_chunk, tag=0, latency=latency)
+                    send_work.wait()
+                    logger.debug(f"Sent chunk {chunk_idx + 1}/{meta['num_chunks']}")
+                    
+                    # Update progress bar with uncompressed chunk size
+                    pbar.update(chunk_size)
+                    pbar.set_postfix(file=meta["path"], chunk=f"{chunk_idx + 1}/{meta['num_chunks']}")
 
     print("All files sent successfully!")
     node.close()
