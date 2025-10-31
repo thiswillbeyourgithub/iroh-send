@@ -106,7 +106,7 @@ uv run iroh_send.py --verbose large_project/
 2. **Node Creation**: Each peer creates an iroh node with their derived seed, resulting in predictable peer IDs
 3. **Connection**: Peers connect to each other using the derived peer IDs
 4. **Metadata Transfer**: Sender transmits JSON metadata describing files, sizes, and types
-5. **File Transfer**: Files are compressed individually using LZMA and transferred sequentially with progress tracking
+5. **File Transfer**: Files are compressed individually using gzip and transferred sequentially with progress tracking
 6. **Directory Handling**: Directories are walked recursively and each file is compressed and transferred individually, preserving the directory structure
 7. **Memory Efficiency**: Files are processed one at a time - data is read, compressed, and sent individually without storing entire directories or large files in memory. This allows efficient transfer of arbitrarily large files and directories
 
@@ -123,9 +123,9 @@ uv run iroh_send.py --verbose large_project/
 The script is designed to handle large files and directories efficiently:
 
 - **Memory efficient**: Files are processed one at a time, so you can transfer arbitrarily large files or directories without running out of memory
-- **Streaming compression**: Each file is read, compressed with LZMA, and sent individually - no need to store all data in memory
+- **Streaming compression**: Each file is read, compressed with gzip, and sent individually - no need to store all data in memory
 - **Progress tracking**: The progress bar shows real-time transfer status for all files
-- **Compression time**: Very large individual files may take time to compress using LZMA. The `--verbose` flag shows detailed transfer information including compression progress
+- **Compression time**: Very large individual files may take time to compress using gzip. The `--verbose` flag shows detailed transfer information including compression progress
 
 ## License
 
