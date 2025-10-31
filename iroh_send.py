@@ -58,7 +58,7 @@ def derive_seeds(token: str) -> Tuple[int, int]:
 def get_node_id_from_seed(seed: int) -> str:
     """Get the peer ID that would be generated from a given seed."""
     # Create temporary node to get its peer ID
-    temp_node = Node.with_seed(1, seed=seed)
+    temp_node = Node.with_seed(num_streams=1, seed=seed)
     node_id = temp_node.node_id()
     temp_node.close()
     return node_id
@@ -95,7 +95,7 @@ def wait_with_timeout(work, timeout: int = 30):
 def establish_connection(node: Node, node_id: str, timeout: int = 30) -> bool:
     """Establish connection to peer and wait until ready."""
     print(f"Connecting to peer {node_id[:16]}...")
-    node.connect(node_id, timeout)
+    node.connect(peer_id_str=node_id, num_retries=timeout)
 
     start_time = time.time()
     while not node.is_ready():
@@ -182,7 +182,7 @@ def receiver_mode(token: str, verbose: bool = False):
 
     # Receive metadata
     logger.debug("Starting metadata receive...")
-    recv_work = node.irecv(0)
+    recv_work = node.irecv(tag=0)
     try:
         metadata_bytes = wait_with_timeout(recv_work, timeout=30)
     except TimeoutError as e:
@@ -265,7 +265,7 @@ def receiver_mode(token: str, verbose: bool = False):
 
             # Receive compressed data
             logger.debug(f"Starting receive for: {path}")
-            recv_work = node.irecv(0)
+            recv_work = node.irecv(tag=0)
             try:
                 compressed_data = wait_with_timeout(recv_work, timeout=30)
             except TimeoutError as e:
@@ -319,7 +319,7 @@ def sender_mode(token: str, files: List[str], verbose: bool = False):
 
     # Initialize sender node
     logger.debug("Initializing sender node...")
-    node = Node.with_seed(1, seed=sender_seed)
+    node = Node.with_seed(num_streams=1, seed=sender_seed)
     sender_node_id = node.node_id()
     print(f"Sender node ID: {sender_node_id}")
     logger.debug(f"Full sender node ID: {sender_node_id}")
@@ -410,7 +410,7 @@ def sender_mode(token: str, files: List[str], verbose: bool = False):
     print(f"Metadata JSON ({len(metadata_bytes)} bytes): {metadata_json}")
 
     logger.debug("Sending metadata...")
-    send_work = node.isend(metadata_bytes, 0, 1000)
+    send_work = node.isend(msg=metadata_bytes, tag=0, latency=1000)
     try:
         wait_with_timeout(send_work, timeout=30)
     except TimeoutError as e:
@@ -440,7 +440,7 @@ def sender_mode(token: str, files: List[str], verbose: bool = False):
 
             # Send compressed data
             logger.debug(f"Sending {len(compressed_data)} bytes for: {original_path}")
-            send_work = node.isend(compressed_data, 0, 1000)
+            send_work = node.isend(msg=compressed_data, tag=0, latency=1000)
             try:
                 wait_with_timeout(send_work, timeout=30)
             except TimeoutError as e:
