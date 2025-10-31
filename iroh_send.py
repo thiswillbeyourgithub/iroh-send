@@ -189,6 +189,12 @@ def main(*files, verbose: bool = False, latency: int = 100, chunk_size: str = "5
     # Determine mode based on arguments
     if not files:
         print("Running in receiver mode...")
+        # Warn if chunk_size was specified - receiver ignores it as chunk size comes from sender's metadata
+        if chunk_size != "5m":
+            logger.warning(
+                f"WARNING: chunk_size parameter ('{chunk_size}') is ignored in receiver mode. "
+                "Chunk size is determined by the sender."
+            )
         receiver_mode(token, verbose)
     else:
         print(f"Running in sender mode with {len(files)} items...")
