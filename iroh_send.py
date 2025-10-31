@@ -38,8 +38,8 @@ from prime_iroh import Node
 # Version of the protocol - sender and receiver must match
 VERSION = "2.0.5"
 
-# Chunk size for file transfers (1 MB) - files are sent/received in chunks to allow streaming
-CHUNK_SIZE = 1024 * 1024
+# Chunk size for file transfers (5 MB) - files are sent/received in chunks to allow streaming
+CHUNK_SIZE = 1024 * 1024 * 5
 
 
 def parse_size(size_str: str) -> int:
@@ -146,7 +146,7 @@ def establish_connection(node: Node, node_id: str, num_retries: int = 30) -> boo
     return True
 
 
-def main(*files, verbose: bool = False, latency: int = 100, chunk_size: str = "1m"):
+def main(*files, verbose: bool = False, latency: int = 100, chunk_size: str = "5m"):
     """Main entry point for iroh_send script.
 
     Parameters
@@ -158,7 +158,7 @@ def main(*files, verbose: bool = False, latency: int = 100, chunk_size: str = "1
     latency : int, optional
         Latency parameter for send operations in milliseconds, by default 100
     chunk_size : str, optional
-        Chunk size for file transfers (e.g., "1k", "1.5m", "3g"), by default "1m"
+        Chunk size for file transfers (e.g., "1k", "1.5m", "3g"), by default "5m"
     """
     # Initialize logging with appropriate level based on verbose flag
     log_level = logging.DEBUG if verbose else logging.INFO
