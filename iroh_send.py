@@ -6,7 +6,7 @@ Requirements for uv run:
 # /// script
 # requires-python = ">=3.8"
 # dependencies = [
-#     "prime-iroh",
+#     "prime-iroh>=0.3.1",
 #     "fire",
 #     "tqdm",
 # ]
