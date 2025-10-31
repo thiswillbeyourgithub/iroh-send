@@ -178,6 +178,10 @@ def receiver_mode(token: str, verbose: bool = False):
     logger.debug(f"Parsed metadata wrapper: {metadata_wrapper}")
     logger.debug(f"Metadata wrapper type: {type(metadata_wrapper)}")
 
+    # Print metadata for visibility regardless of verbose mode
+    metadata_json = json.dumps(metadata_wrapper)
+    print(f"Metadata JSON ({len(metadata_bytes)} bytes): {metadata_json}")
+
     # Type checking to ensure metadata_wrapper is a dict - this validates JSON structure
     if not isinstance(metadata_wrapper, dict):
         print(
