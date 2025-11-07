@@ -556,9 +556,9 @@ def sender_mode(
                 for chunk_idx in range(meta["num_chunks"]):
                     # Read chunk
                     chunk_data = f.read(chunk_size)
-                    chunk_size = len(chunk_data)
+                    actual_chunk_size = len(chunk_data)
                     logger.debug(
-                        f"Read chunk {chunk_idx + 1}/{meta['num_chunks']}: {chunk_size} bytes"
+                        f"Read chunk {chunk_idx + 1}/{meta['num_chunks']}: {actual_chunk_size} bytes"
                     )
 
                     # Compress chunk using gzip
@@ -571,7 +571,7 @@ def sender_mode(
                     logger.debug(f"Sent chunk {chunk_idx + 1}/{meta['num_chunks']}")
 
                     # Update progress bar with uncompressed chunk size
-                    pbar.update(chunk_size)
+                    pbar.update(actual_chunk_size)
                     pbar.set_postfix(
                         file=meta["path"], chunk=f"{chunk_idx + 1}/{meta['num_chunks']}"
                     )
