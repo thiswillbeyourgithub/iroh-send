@@ -37,7 +37,7 @@ from tqdm import tqdm
 from prime_iroh import Node
 
 # Version of the protocol - sender and receiver must match
-VERSION = "2.1.1"
+VERSION = "2.2.0"
 
 # Chunk size for file transfers (5 MB) - files are sent/received in chunks to allow streaming
 CHUNK_SIZE = 1024 * 1024 * 5
@@ -394,6 +394,12 @@ def receiver_mode(token: str, verbose: bool = False):
                     temp_path.unlink()
                 raise
 
+    # Send acknowledgment to sender so it knows we received everything
+    logger.debug("Sending ACK to sender...")
+    ack_work = node.isend(msg=b"ACK", tag=0, latency=100)
+    ack_work.wait()
+    logger.debug("ACK sent")
+
     print("All files received successfully!")
     node.close()
 
@@ -575,6 +581,13 @@ def sender_mode(
                     pbar.set_postfix(
                         file=meta["path"], chunk=f"{chunk_idx + 1}/{meta['num_chunks']}"
                     )
+
+    # Wait for receiver acknowledgment before closing
+    print("Waiting for receiver acknowledgment...")
+    logger.debug("Waiting for ACK from receiver...")
+    ack_work = node.irecv(tag=0)
+    ack_bytes = ack_work.wait()
+    logger.debug(f"Received ACK: {ack_bytes}")
 
     print("All files sent successfully!")
     node.close()
